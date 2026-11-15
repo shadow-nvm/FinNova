@@ -1,0 +1,94 @@
+rules_version = '2';
+
+// FinNova security rules.
+// Every document is owned by the uid stored in `ownerId`; nobody else can read or write it.
+// The app never trusts a uid from the client UI — it always writes the signed-in uid.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsExisting() {
+      return signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function claimsOwnership() {
+      return signedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function keepsOwnership() {
+      return signedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function validTransaction() {
+      return request.resource.data.type in ['income', 'expense']
+        && request.resource.data.category is string
+        && request.resource.data.category.size() > 0
+        && request.resource.data.category.size() <= 40
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.amount <= 1000000000
+        && request.resource.data.date is string;
+    }
+
+    function validBudget() {
+      return request.resource.data.category is string
+        && request.resource.data.category.size() > 0
+        && request.resource.data.amount is number
+        && request.resource.data.amount >= 0
+        && request.resource.data.amount <= 1000000000;
+    }
+
+    function validGoal() {
+      return request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.targetAmount is number
+        && request.resource.data.targetAmount >= 0
+        && request.resource.data.savedAmount is number
+        && request.resource.data.savedAmount >= 0;
+    }
+
+    function validReminder() {
+      return request.resource.data.type in ['bill', 'saving']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.amount is number
+        && request.resource.data.amount >= 0
+        && request.resource.data.day is int
+        && request.resource.data.day >= 1
+        && request.resource.data.day <= 28;
+    }
+
+    match /transactions/{transactionId} {
+      allow read, delete: if ownsExisting();
+      allow create: if claimsOwnership() && validTransaction();
+      allow update: if ownsExisting() && keepsOwnership();
+    }
+
+    match /budgets/{budgetId} {
+      allow read, delete: if ownsExisting();
+      allow create: if claimsOwnership() && validBudget();
+      allow update: if ownsExisting() && keepsOwnership();
+    }
+
+    match /goals/{goalId} {
+      allow read, delete: if ownsExisting();
+      allow create: if claimsOwnership() && validGoal();
+      allow update: if ownsExisting() && keepsOwnership();
+    }
+
+    match /reminders/{reminderId} {
+      allow read, delete: if ownsExisting();
+      allow create: if claimsOwnership() && validReminder();
+      allow update: if ownsExisting() && keepsOwnership();
+    }
+
+    // Everything else is closed by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
