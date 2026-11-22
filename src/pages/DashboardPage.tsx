@@ -9,6 +9,7 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
+  Sector,
   Tooltip,
   XAxis,
   YAxis,
@@ -16,6 +17,7 @@ import {
 import { useAuth } from "../auth/AuthProvider";
 import { TransactionModal } from "../components/TransactionModal";
 import {
+  AnimatedMoney,
   EmptyState,
   LoadingPage,
   Modal,
@@ -50,8 +52,36 @@ import {
 } from "../lib/format";
 import { useData } from "../store/DataProvider";
 
+type ActiveSliceProps = {
+  cx?: number;
+  cy?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  startAngle?: number;
+  endAngle?: number;
+  fill?: string;
+};
+
+/** Grows and lifts the hovered pie slice so the chart responds to the pointer. */
+function ActiveSlice({ cx = 0, cy = 0, innerRadius = 0, outerRadius = 0, startAngle = 0, endAngle = 0, fill = "#7c5cff" }: ActiveSliceProps) {
+  return (
+    <Sector
+      cx={cx}
+      cy={cy}
+      innerRadius={Math.max(0, innerRadius - 5)}
+      outerRadius={outerRadius + 8}
+      startAngle={startAngle}
+      endAngle={endAngle}
+      cornerRadius={7}
+      fill={fill}
+      stroke="rgba(255,255,255,0.35)"
+      strokeWidth={1}
+    />
+  );
+}
+
 const TOOLTIP_STYLE = {
-  backgroundColor: "var(--card-2)",
+  backgroundColor: "var(--card-solid)",
   border: "1px solid var(--line)",
   borderRadius: 10,
   color: "var(--text)",
@@ -64,6 +94,7 @@ export function DashboardPage() {
   const notify = useToast();
   const [adding, setAdding] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  const [activeSlice, setActiveSlice] = useState<number | null>(null);
   const { transactions, budgets, goals, reminders } = data;
 
   const stats = useMemo(() => {
@@ -134,26 +165,26 @@ export function DashboardPage() {
       <div className="grid cols-4" style={{ marginBottom: 20 }}>
         <StatCard
           label="Income (this month)"
-          value={money(stats.current.income)}
+          value={<AnimatedMoney value={stats.current.income} />}
           emoji="💰"
           tone="pos"
         />
         <StatCard
           label="Spending (this month)"
-          value={money(stats.current.expense)}
+          value={<AnimatedMoney value={stats.current.expense} />}
           emoji="💸"
           tone="neg"
         />
         <StatCard
           label="Net saved"
-          value={money(stats.current.net)}
+          value={<AnimatedMoney value={stats.current.net} />}
           emoji="🏦"
           tone={stats.current.net >= 0 ? "pos" : "neg"}
           foot={`${stats.rate}% of income`}
         />
         <StatCard
           label="All-time net"
-          value={money(stats.allTime.net)}
+          value={<AnimatedMoney value={stats.allTime.net} />}
           emoji="🌍"
           tone={stats.allTime.net >= 0 ? "pos" : "neg"}
         />
@@ -210,7 +241,12 @@ export function DashboardPage() {
                   name="Income"
                   stroke="#34d399"
                   fill="url(#gradIncome)"
-                  strokeWidth={2}
+                  strokeWidth={2.4}
+                  dot={false}
+                  animationBegin={0}
+                  animationDuration={1500}
+                  animationEasing="ease-out"
+                  activeDot={{ r: 5, strokeWidth: 3, stroke: "rgba(7,11,23,0.85)" }}
                 />
                 <Area
                   type="monotone"
@@ -218,7 +254,12 @@ export function DashboardPage() {
                   name="Expenses"
                   stroke="#f43f5e"
                   fill="url(#gradExpense)"
-                  strokeWidth={2}
+                  strokeWidth={2.4}
+                  dot={false}
+                  animationBegin={220}
+                  animationDuration={1500}
+                  animationEasing="ease-out"
+                  activeDot={{ r: 5, strokeWidth: 3, stroke: "rgba(7,11,23,0.85)" }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -288,7 +329,15 @@ export function DashboardPage() {
                     outerRadius={85}
                     innerRadius={50}
                     paddingAngle={2}
+                    cornerRadius={6}
                     stroke="none"
+                    activeIndex={activeSlice ?? undefined}
+                    activeShape={ActiveSlice}
+                    onMouseEnter={(_, index) => setActiveSlice(index)}
+                    onMouseLeave={() => setActiveSlice(null)}
+                    animationBegin={160}
+                    animationDuration={1100}
+                    animationEasing="ease-out"
                   >
                     {stats.categories.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
@@ -300,8 +349,13 @@ export function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <div className="category-rows">
-              {stats.categories.map((entry) => (
-                <div className="category-row" key={entry.name}>
+              {stats.categories.map((entry, index) => (
+                <div
+                  className={`category-row${activeSlice === index ? " active" : ""}`}
+                  key={entry.name}
+                  onMouseEnter={() => setActiveSlice(index)}
+                  onMouseLeave={() => setActiveSlice(null)}
+                >
                   <span className="dot" style={{ background: entry.color }} />
                   <span>{entry.name}</span>
                   <span className="muted">{money(entry.value)}</span>

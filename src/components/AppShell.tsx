@@ -30,6 +30,34 @@ export function AppShell() {
   const online = useOnlineStatus();
   const region = countryByCode(country);
 
+  // Cursor-following glow on the frosted cards. Decorative only — the CSS
+  // reads --mx/--my and falls back to the centre when they are absent.
+  useEffect(() => {
+    let frame = 0;
+    let pending: { card: HTMLElement; x: number; y: number } | null = null;
+    const apply = () => {
+      frame = 0;
+      if (!pending) return;
+      const { card, x, y } = pending;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${Math.round(x - rect.left)}px`);
+      card.style.setProperty("--my", `${Math.round(y - rect.top)}px`);
+    };
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") return;
+      const target = event.target as Element | null;
+      const card = target?.closest?.(".card") as HTMLElement | null;
+      if (!card) return;
+      pending = { card, x: event.clientX, y: event.clientY };
+      if (!frame) frame = window.requestAnimationFrame(apply);
+    };
+    document.addEventListener("pointermove", onMove, { passive: true });
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const navLinks = NAV_ITEMS.map((item) => (
     <NavLink
       key={item.to}

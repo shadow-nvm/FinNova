@@ -9,7 +9,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { LoadingPage, PageHead, SectionTitle, StatCard, useToast } from "../components/ui";
+import {
+  AnimatedMoney,
+  LoadingPage,
+  PageHead,
+  SectionTitle,
+  StatCard,
+  useToast,
+} from "../components/ui";
 import {
   categoryTotals,
   inMonth,
@@ -35,7 +42,7 @@ import { fullBackupJson, monthCsv } from "../lib/csv";
 import { useData } from "../store/DataProvider";
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "var(--card-2)",
+  backgroundColor: "var(--card-solid)",
   border: "1px solid var(--line)",
   borderRadius: 10,
   color: "var(--text)",
@@ -145,26 +152,35 @@ export function ReportsPage() {
       </div>
 
       <div className="grid cols-4" style={{ marginBottom: 20 }}>
-        <StatCard label={`Income · ${monthShort(selected)}`} value={money(stats.income)} emoji="💰" tone="pos" />
-        <StatCard label="Spending" value={money(stats.expense)} emoji="💸" tone="neg" />
+        <StatCard
+          label={`Income · ${monthShort(selected)}`}
+          value={<AnimatedMoney value={stats.income} />}
+          emoji="💰"
+          tone="pos"
+        />
+        <StatCard label="Spending" value={<AnimatedMoney value={stats.expense} />} emoji="💸" tone="neg" />
         <StatCard
           label="Net saved"
-          value={money(stats.net)}
+          value={<AnimatedMoney value={stats.net} />}
           emoji="🏦"
           tone={stats.net >= 0 ? "pos" : "neg"}
           foot={`${rate}% of income`}
         />
         <StatCard
           label="Daily average spend"
-          value={money(
-            stats.expense /
-              Math.max(
-                1,
-                selected === currentMonthKey()
-                  ? new Date().getDate()
-                  : new Date(Number(selected.slice(0, 4)), Number(selected.slice(5, 7)), 0).getDate(),
-              ),
-          )}
+          value={
+            <AnimatedMoney
+              value={
+                stats.expense /
+                Math.max(
+                  1,
+                  selected === currentMonthKey()
+                    ? new Date().getDate()
+                    : new Date(Number(selected.slice(0, 4)), Number(selected.slice(5, 7)), 0).getDate(),
+                )
+              }
+            />
+          }
           emoji="📅"
           foot={selected === currentMonthKey() ? "this month so far" : `across ${monthShort(selected)}`}
         />
@@ -183,6 +199,16 @@ export function ReportsPage() {
           </SectionTitle>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barIncome" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#5eead4" />
+                  <stop offset="100%" stopColor="#34d399" stopOpacity={0.55} />
+                </linearGradient>
+                <linearGradient id="barExpense" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#fb7185" />
+                  <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.55} />
+                </linearGradient>
+              </defs>
               <CartesianGrid stroke="var(--line)" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -199,10 +225,32 @@ export function ReportsPage() {
                 width={52}
                 tickFormatter={compactMoney}
               />
-              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => money(Number(value))} />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                cursor={{ fill: "rgba(148, 170, 220, 0.08)", radius: 8 }}
+                formatter={(value) => money(Number(value))}
+              />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="income" name="Income" fill="#34d399" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="expense" name="Expenses" fill="#f43f5e" radius={[6, 6, 0, 0]} />
+              <Bar
+                dataKey="income"
+                name="Income"
+                fill="url(#barIncome)"
+                radius={[7, 7, 0, 0]}
+                maxBarSize={26}
+                animationBegin={0}
+                animationDuration={1100}
+                animationEasing="ease-out"
+              />
+              <Bar
+                dataKey="expense"
+                name="Expenses"
+                fill="url(#barExpense)"
+                radius={[7, 7, 0, 0]}
+                maxBarSize={26}
+                animationBegin={200}
+                animationDuration={1100}
+                animationEasing="ease-out"
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -247,7 +295,7 @@ export function ReportsPage() {
           ) : (
             <div className="category-breakdown">
               {categoryRows.map((category) => (
-                <div className="category-breakdown-row" key={category.name}>
+                <div className="category-breakdown-row" key={category.name} style={{ animationDelay: `${0.06 * categoryRows.indexOf(category)}s` }}>
                   <div className="category-breakdown-head">
                     <span>
                       {CATEGORY_EMOJI[category.name] || "📦"} {category.name}

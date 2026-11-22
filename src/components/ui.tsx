@@ -225,6 +225,52 @@ export function StatCard({
   );
 }
 
+/* ------------------------------ Animated money ----------------------------- */
+
+/**
+ * Counts a money value up (or down) whenever it changes. The first render
+ * animates from zero so the stat tiles feel alive as the dashboard appears.
+ */
+export function AnimatedMoney({ value, duration = 900 }: { value: number; duration?: number }) {
+  const [shown, setShown] = useState(0);
+  const shownRef = useRef(0);
+
+  useEffect(() => {
+    const reduce =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const from = shownRef.current;
+    const target = Number.isFinite(value) ? value : 0;
+
+    if (reduce || Math.abs(target - from) < 1) {
+      shownRef.current = target;
+      setShown(target);
+      return;
+    }
+
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const next = from + (target - from) * eased;
+      shownRef.current = next;
+      setShown(next);
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(tick);
+      } else {
+        shownRef.current = target;
+        setShown(target);
+      }
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [value, duration]);
+
+  return <>{money(shown)}</>;
+}
+
 /* ------------------------------- Skeletons -------------------------------- */
 
 export function LoadingPage() {
