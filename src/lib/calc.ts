@@ -116,8 +116,11 @@ export function goalProgress(goal: Goal, today = new Date()): GoalProgress {
   const saved = Number(goal.savedAmount || 0);
   const pct = target > 0 ? clamp((saved / target) * 100, 0, 100) : 0;
   const targetDate = parseDate(goal.targetDate);
+  // Count whole calendar days so a target date is "0 days left" all day long
+  // instead of flipping based on the current time.
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const daysLeft = targetDate
-    ? Math.ceil((targetDate.getTime() - today.getTime()) / 86_400_000)
+    ? Math.round((targetDate.getTime() - startOfToday.getTime()) / 86_400_000)
     : null;
   const remaining = target - saved;
   const monthsLeft =
@@ -325,6 +328,22 @@ export function buildInsights(
     }
     const remaining = Number(goal.targetAmount || 0) - Number(goal.savedAmount || 0);
     if (remaining <= 0 || !goal.targetDate) return;
+    // An overdue goal has no months left, so a "per month" figure would be
+    // zero and meaningless; say what is actually needed instead.
+    if (progressInfo.daysLeft != null && progressInfo.daysLeft <= 0) {
+      insights.push({
+        key: `goal-due-${goal.id}`,
+        priority: "med",
+        emoji: "📅",
+        title: `${goal.name} needs ${money(remaining)} more`,
+        detail:
+          progressInfo.daysLeft === 0 ? "Target date is today" : "Target date has passed",
+        body: `You still need ${money(
+          remaining,
+        )} to finish this goal. Add a contribution or move the target date to keep the plan realistic.`,
+      });
+      return;
+    }
     const perMonth = progressInfo.monthlyNeeded ?? 0;
     if (perMonth > stats.income * 0.5 && stats.income > 0) {
       insights.push({

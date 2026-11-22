@@ -22,7 +22,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { useAuth } from "../auth/AuthProvider";
-import { convertAmount } from "../lib/currencies";
+import { amountUpdates } from "../lib/convertAmounts";
 import { db, firebaseEnabled, friendlyError } from "../lib/firebase";
 import { normalizeDate } from "../lib/format";
 import type {
@@ -39,6 +39,14 @@ import type {
 import { demoStore } from "./demo";
 
 const COLLECTIONS: CollectionName[] = ["transactions", "budgets", "goals", "reminders"];
+/** Firestore allows 500 writes per transaction and per batch; stay below both. */
+const TRANSACTION_WRITE_LIMIT = 500;
+const BATCH_WRITE_LIMIT = 400;
+/** A single batch commits atomically, so imports of up to this size cannot be
+ *  left half-written; bigger files fall back to several batches. */
+const IMPORT_BATCH_LIMIT = 499;
+const CONVERSION_CONFLICT = "finnova/conversion-conflict";
+const CONVERSION_INCOMPLETE = "finnova/conversion-incomplete";
 const EMPTY = {
   transactions: [] as Transaction[],
   budgets: [] as Budget[],
@@ -229,10 +237,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const uid = requireUid();
         const database = db!;
         const accountRef = doc(database, "users", uid);
+        const updates = amountUpdates({ transactions, budgets, goals, reminders }, from, to);
+        // One transaction can hold the currency claim plus every amount write
+        // for all but very large accounts, which makes the whole conversion
+        // all-or-nothing. The claim itself always runs first: if another device
+        // recorded a different stored currency, nothing is touched.
+        const atomic = updates.length + 1 <= TRANSACTION_WRITE_LIMIT;
 
-        // Claim the conversion on the account before touching any amounts. If
-        // another device already recorded a different stored currency, stop:
-        // converting again would scale the data a second time.
         await runTransaction(database, async (transaction) => {
           const account = await transaction.get(accountRef);
           const stored = account.data()?.storedCurrency;
@@ -241,7 +252,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
               new Error(
                 `Your account already stores amounts in ${stored}, so this conversion was skipped to avoid converting twice.`,
               ),
-              { code: "finnova/conversion-conflict" },
+              { code: CONVERSION_CONFLICT },
             );
           }
           transaction.set(
@@ -249,40 +260,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
             { storedCurrency: to, updatedAt: serverTimestamp() },
             { merge: true },
           );
+          if (atomic) {
+            updates.forEach((update) =>
+              transaction.update(doc(database, update.collection, update.id), update.data),
+            );
+          }
         });
 
-        const convert = (value: unknown) => convertAmount(Number(value || 0), from, to);
-        const updates: { path: string; data: Record<string, number> }[] = [];
-        transactions.forEach((tx) =>
-          updates.push({ path: `transactions/${tx.id}`, data: { amount: convert(tx.amount) } }),
-        );
-        budgets.forEach((budget) =>
-          updates.push({ path: `budgets/${budget.id}`, data: { amount: convert(budget.amount) } }),
-        );
-        goals.forEach((goal) =>
-          updates.push({
-            path: `goals/${goal.id}`,
-            data: {
-              targetAmount: convert(goal.targetAmount),
-              savedAmount: convert(goal.savedAmount),
-            },
-          }),
-        );
-        reminders.forEach((reminder) =>
-          updates.push({
-            path: `reminders/${reminder.id}`,
-            data: { amount: convert(reminder.amount) },
-          }),
-        );
-        for (let index = 0; index < updates.length; index += 400) {
-          const batch = writeBatch(database);
-          updates.slice(index, index + 400).forEach((update) => {
-            batch.update(doc(database, update.path), update.data);
-          });
-          await batch.commit();
+        if (atomic) return;
+        // More writes than a transaction allows: the claim above still stops a
+        // second conversion, but these batches cannot be atomic.
+        try {
+          for (let index = 0; index < updates.length; index += BATCH_WRITE_LIMIT) {
+            const batch = writeBatch(database);
+            updates.slice(index, index + BATCH_WRITE_LIMIT).forEach((update) => {
+              batch.update(doc(database, update.collection, update.id), update.data);
+            });
+            await batch.commit();
+          }
+        } catch (cause) {
+          throw Object.assign(
+            new Error(
+              `Conversion stopped after only some records were updated. Your account now records amounts in ${to} — reload, review the amounts, and do not convert again.`,
+            ),
+            { code: CONVERSION_INCOMPLETE, cause },
+          );
         }
       } catch (cause) {
-        if ((cause as { code?: string } | null)?.code === "finnova/conversion-conflict") throw cause;
+        const code = (cause as { code?: string } | null)?.code;
+        if (code === CONVERSION_CONFLICT || code === CONVERSION_INCOMPLETE) throw cause;
         return fail(cause);
       }
     },
@@ -339,10 +345,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const uid = requireUid();
         const database = db!;
-        // Firestore allows 500 writes per batch; stay comfortably below it.
-        for (let index = 0; index < inputs.length; index += 400) {
+        for (let index = 0; index < inputs.length; index += IMPORT_BATCH_LIMIT) {
           const batch = writeBatch(database);
-          inputs.slice(index, index + 400).forEach((input) => {
+          inputs.slice(index, index + IMPORT_BATCH_LIMIT).forEach((input) => {
             batch.set(doc(collection(database, "transactions")), {
               ...input,
               ownerId: uid,

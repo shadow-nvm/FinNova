@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../lib/constants";
-import { currencySymbol, todayInput } from "../lib/format";
+import { currencySymbol, dateInput, todayInput } from "../lib/format";
 import type { Transaction, TxInput, TxType } from "../types";
 import { Modal } from "./ui";
 
@@ -50,7 +50,7 @@ export function TransactionModal({
         type: initial.type,
         category: initial.category,
         amount: String(initial.amount ?? ""),
-        date: (initial.date || todayInput()).slice(0, 10),
+        date: dateInput(initial.date) || todayInput(),
         note: initial.note || "",
       });
     } else if (duplicate) {

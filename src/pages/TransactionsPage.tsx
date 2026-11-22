@@ -143,10 +143,8 @@ export function TransactionsPage() {
     if (!preview) return;
     setImporting(true);
     try {
-      const count = await data.importTransactions(
-        preview.rows.map((row) => ({ ...row })),
-      );
-      notify(`Imported ${count} transactions.`);
+      const count = await data.importTransactions(preview.rows);
+      notify(`Imported ${count} transaction${count === 1 ? "" : "s"}.`);
       setPreview(null);
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : "Import failed.", "error");

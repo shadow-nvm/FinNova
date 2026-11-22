@@ -143,7 +143,7 @@ export function RemindersPage() {
           <div className="tx-sub">
             {money(reminder.amount)} · day {reminder.day} · next due{" "}
             {dateShort(due.toISOString())}
-            {reminder.lastPaidDate ? " · paid this cycle" : ""}
+            {reminder.lastPaidDate ? ` · last paid ${dateShort(reminder.lastPaidDate)}` : ""}
           </div>
         </div>
         <span className="due-badge" style={colors}>

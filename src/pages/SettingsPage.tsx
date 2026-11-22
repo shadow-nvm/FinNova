@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { Modal, PageHead, SectionTitle, useToast } from "../components/ui";
 import { COUNTRIES, CURRENCIES, currencyByCode, conversionRate } from "../lib/currencies";
@@ -38,6 +38,9 @@ export function SettingsPage() {
   // Region/currency must not change while the account's saved values load,
   // otherwise the account would overwrite the user's fresh choice.
   const syncing = syncState === "loading";
+  // The conversion guard lives in the account document, so conversion cannot
+  // run safely until account sync works.
+  const syncFailed = syncState === "error";
 
   const countryDef = COUNTRIES.find((entry) => entry.code === country);
   const currencyDef = currencyByCode(currency);
@@ -47,24 +50,28 @@ export function SettingsPage() {
   const needsConversion = currency !== storedCurrency && recordCount > 0;
   const factor = conversionRate(storedCurrency, currency);
 
-  // With nothing stored yet there is nothing to convert, so the new currency
-  // becomes the storage currency straight away.
-  const markStoredIfEmpty = (code: string) => {
-    if (recordCount === 0 && !data.loading) setStoredCurrency(code);
-  };
-
-  const changeCountry = (code: string) => {
-    setCountry(code);
-    const next = COUNTRIES.find((entry) => entry.code === code);
-    if (next) markStoredIfEmpty(next.currency);
-  };
-
-  const changeCurrency = (code: string) => {
-    setCurrency(code);
-    markStoredIfEmpty(code);
-  };
+  // With nothing stored, the display currency becomes the storage currency.
+  // Running this after the records load (instead of inside the change
+  // handlers) covers a currency change made while they were still loading, and
+  // it only trusts a server-confirmed empty snapshot.
+  useEffect(() => {
+    if (syncState !== "synced" && syncState !== "local") return;
+    if (data.loading || data.fromCache || data.error) return;
+    if (recordCount > 0 || currency === storedCurrency) return;
+    setStoredCurrency(currency);
+  }, [
+    syncState,
+    data.loading,
+    data.fromCache,
+    data.error,
+    recordCount,
+    currency,
+    storedCurrency,
+    setStoredCurrency,
+  ]);
 
   const convert = async () => {
+    if (converting) return;
     setConverting(true);
     try {
       await data.convertCurrency(storedCurrency, currency);
@@ -105,7 +112,7 @@ export function SettingsPage() {
               id="settings-country"
               value={country}
               disabled={converting || syncing}
-              onChange={(event) => changeCountry(event.target.value)}
+              onChange={(event) => setCountry(event.target.value)}
             >
               {SORTED_COUNTRIES.map((entry) => (
                 <option key={entry.code} value={entry.code}>
@@ -124,7 +131,7 @@ export function SettingsPage() {
               id="settings-currency"
               value={currency}
               disabled={converting || syncing}
-              onChange={(event) => changeCurrency(event.target.value)}
+              onChange={(event) => setCurrency(event.target.value)}
             >
               {SORTED_CURRENCIES.map((entry) => (
                 <option key={entry.code} value={entry.code}>
@@ -186,7 +193,7 @@ export function SettingsPage() {
                   className="btn btn-primary btn-sm"
                   type="button"
                   onClick={() => void convert()}
-                  disabled={converting || syncing}
+                  disabled={converting || syncing || syncFailed}
                 >
                   {converting
                     ? "Converting…"
@@ -198,7 +205,7 @@ export function SettingsPage() {
                   className="btn btn-ghost btn-sm"
                   type="button"
                   onClick={keepNumbers}
-                  disabled={converting || syncing}
+                  disabled={converting || syncing || syncFailed}
                 >
                   Keep numbers as they are
                 </button>
@@ -217,10 +224,11 @@ export function SettingsPage() {
               ☁️ Saved to your account — this currency is used on your other devices too.
             </div>
           )}
-          {syncState === "error" && (
+          {syncFailed && (
             <div className="sync-note error">
-              ⚠️ Account sync failed. Deploy the updated Firestore rules for the <code>users</code>{" "}
-              collection, then reload. This device keeps the currency until then.
+              ⚠️ Account sync failed, so this currency may not reach your other devices. If it
+              keeps happening, deploy the updated Firestore rules for the <code>users</code>{" "}
+              collection, then reload.
             </div>
           )}
 

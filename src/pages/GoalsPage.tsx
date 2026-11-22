@@ -10,7 +10,7 @@ import {
 } from "../components/ui";
 import { goalProgress } from "../lib/calc";
 import { GOAL_ICONS } from "../lib/constants";
-import { compactMoney, currencySymbol, dateLong, money } from "../lib/format";
+import { compactMoney, currencySymbol, dateInput, dateLong, money } from "../lib/format";
 import type { Goal } from "../types";
 import { useData } from "../store/DataProvider";
 
@@ -68,7 +68,7 @@ export function GoalsPage() {
       name: goal.name,
       icon: goal.icon || "🎯",
       targetAmount: String(goal.targetAmount || ""),
-      targetDate: goal.targetDate ? goal.targetDate.slice(0, 10) : "",
+      targetDate: dateInput(goal.targetDate),
     });
     setError("");
     setModal({ mode: "edit", goal });

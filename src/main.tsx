@@ -5,12 +5,9 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./styles.css";
 
-try {
-  const saved = localStorage.getItem("finnova_theme");
-  document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
-} catch {
-  document.documentElement.dataset.theme = "dark";
-}
+// The pre-paint theme is applied by the inline script in index.html, which
+// reads the saved setting; SettingsProvider re-applies it on mount. Doing it
+// again here would overwrite that value with a stale key.
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

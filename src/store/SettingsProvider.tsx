@@ -138,7 +138,11 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user, isDemo } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
-  const [syncState, setSyncState] = useState<SettingsSync>("local");
+  // Start in "loading" for a signed-in account so nothing acts on the local
+  // fallback before the account's saved values arrive.
+  const [syncState, setSyncState] = useState<SettingsSync>(() =>
+    db && user && !isDemo ? "loading" : "local",
+  );
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   // Account the preferences were successfully read from; writes are gated on
@@ -192,7 +196,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           syncedUser.current = uid;
           setSettings(next);
         } else {
-          await setDoc(accountRef, accountPayload(current));
+          // Merge so an existing document without readable fields is completed
+          // instead of replaced.
+          await setDoc(accountRef, accountPayload(current), { merge: true });
           if (cancelled) return;
           lastWritten.current = regionSignature(uid, current);
           syncedUser.current = uid;

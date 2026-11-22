@@ -100,7 +100,11 @@ npm run build     # typecheck + production bundle
 ```
 
 The currency conversion maths (`conversionRate`, `convertAmount`, `roundMoney`) is covered by
-`src/lib/currencies.test.ts`.
+`src/lib/currencies.test.ts`. `src/lib/convertAmounts.test.ts` checks which record fields hold
+money, that a goal's target and saved amounts are both converted, and that non-money fields
+survive a conversion. `src/lib/csv.test.ts` covers CSV import/export edge cases (BOM, date
+order, decimal commas, formula protection, rule limits) and `src/lib/calc.test.ts` covers goal
+day counting and the overdue-goal insight.
 
 ## CSV import format
 
@@ -113,7 +117,11 @@ Date,Type,Category,Amount,Note
 ```
 
 `Date` and `Amount` are required. `Type` defaults to expense if missing or unrecognised.
-Rows with invalid dates or amounts are reported before anything is written.
+Rows with invalid dates, amounts above 1,000,000,000 or categories longer than 40 characters
+are reported before anything is written. Dates may be `YYYY-MM-DD` (recommended) or numeric;
+two-part numeric dates are read day-first (`05/03/2026` is 5 March). UTF-8 with or without a
+BOM is accepted. Exported cells that could be read as spreadsheet formulas are prefixed with
+an apostrophe, which the importer removes again.
 
 ## Project layout
 
@@ -125,6 +133,8 @@ src/
   store/demo.ts            Local demo workspace with sample data
   lib/currencies.ts        Country/currency catalogue, rates, conversion maths
   lib/currencies.test.ts   Unit tests for the conversion maths
+  lib/convertAmounts.ts    Which record fields hold money, and applying a conversion
+  lib/convertAmounts.test.ts  Unit tests for the conversion mapping
   lib/calc.ts              Money maths + insights engine
   lib/csv.ts               CSV import/export, JSON backup
   components/              App shell, dialogs, shared UI

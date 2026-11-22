@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -254,12 +253,4 @@ export function Money({ value, signed = false }: { value: number; signed?: boole
       {money(Math.abs(value))}
     </span>
   );
-}
-
-/* --------------------------------- Hooks ---------------------------------- */
-
-export function useMounted() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return useMemo(() => mounted, [mounted]);
 }

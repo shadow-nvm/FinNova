@@ -73,15 +73,6 @@ export function currencySymbol(): string {
   return activeCurrency().symbol;
 }
 
-/** Amount without the currency symbol, e.g. 1,234.50 */
-export function amount(value: unknown): string {
-  const { locale, decimals } = activeCurrency();
-  return Number(value || 0).toLocaleString(locale, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
 /** Timezone-safe parser: date-only strings are read as local dates. */
 export function parseDate(value?: string | null): Date | null {
   if (!value) return null;
@@ -150,6 +141,15 @@ export function todayInput(): string {
   const d = new Date();
   const offset = d.getTimezoneOffset();
   return new Date(d.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD in local time, for <input type="date"> and CSV exports. */
+export function dateInput(value?: string | null): string {
+  const d = parseDate(value);
+  if (!d) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
 }
 
 export function normalizeDate(value: unknown): string {
