@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../lib/constants";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, MAX_STORED_AMOUNT } from "../lib/constants";
 import { currencySymbol, dateInput, todayInput } from "../lib/format";
 import type { Transaction, TxInput, TxType } from "../types";
 import { Modal } from "./ui";
@@ -87,6 +87,10 @@ export function TransactionModal({
     const value = Number(draft.amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError("Enter a valid amount greater than zero.");
+      return;
+    }
+    if (value > MAX_STORED_AMOUNT) {
+      setError(`Enter an amount of ${MAX_STORED_AMOUNT.toLocaleString("en-US")} or less.`);
       return;
     }
     if (!draft.date) {

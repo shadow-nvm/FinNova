@@ -21,23 +21,27 @@ service cloud.firestore {
       return signedIn() && request.resource.data.ownerId == request.auth.uid;
     }
 
+    function validTransactionAmount(value) {
+      return value is number && value > 0 && value <= 1000000000;
+    }
+
     function validTransaction() {
       return request.resource.data.type in ['income', 'expense']
         && request.resource.data.category is string
         && request.resource.data.category.size() > 0
         && request.resource.data.category.size() <= 40
-        && request.resource.data.amount is number
-        && request.resource.data.amount > 0
-        && request.resource.data.amount <= 1000000000
+        && validTransactionAmount(request.resource.data.amount)
         && request.resource.data.date is string;
+    }
+
+    function validBudgetAmount(value) {
+      return value is number && value >= 0 && value <= 1000000000;
     }
 
     function validBudget() {
       return request.resource.data.category is string
         && request.resource.data.category.size() > 0
-        && request.resource.data.amount is number
-        && request.resource.data.amount >= 0
-        && request.resource.data.amount <= 1000000000;
+        && validBudgetAmount(request.resource.data.amount);
     }
 
     function validGoal() {
@@ -62,16 +66,28 @@ service cloud.firestore {
         && request.resource.data.day <= 28;
     }
 
+    // Updates only have to satisfy the amount range when they actually change
+    // the amount. Records saved before these limits (a legacy zero, or an
+    // amount above the cap) therefore stay editable without touching that
+    // field, while an edit or conversion can no longer move an amount out of
+    // range.
+    function amountUnchanged() {
+      return !('amount' in resource.data)
+        || request.resource.data.amount == resource.data.amount;
+    }
+
     match /transactions/{transactionId} {
       allow read, delete: if ownsExisting();
       allow create: if claimsOwnership() && validTransaction();
-      allow update: if ownsExisting() && keepsOwnership();
+      allow update: if ownsExisting() && keepsOwnership()
+        && (amountUnchanged() || validTransactionAmount(request.resource.data.amount));
     }
 
     match /budgets/{budgetId} {
       allow read, delete: if ownsExisting();
       allow create: if claimsOwnership() && validBudget();
-      allow update: if ownsExisting() && keepsOwnership();
+      allow update: if ownsExisting() && keepsOwnership()
+        && (amountUnchanged() || validBudgetAmount(request.resource.data.amount));
     }
 
     match /goals/{goalId} {

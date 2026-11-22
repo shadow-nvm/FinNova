@@ -22,7 +22,8 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { useAuth } from "../auth/AuthProvider";
-import { amountUpdates } from "../lib/convertAmounts";
+import { amountUpdates, hasOutOfRangeAmount } from "../lib/convertAmounts";
+import { MAX_STORED_AMOUNT } from "../lib/constants";
 import { db, firebaseEnabled, friendlyError } from "../lib/firebase";
 import { normalizeDate } from "../lib/format";
 import type {
@@ -39,14 +40,14 @@ import type {
 import { demoStore } from "./demo";
 
 const COLLECTIONS: CollectionName[] = ["transactions", "budgets", "goals", "reminders"];
-/** Firestore allows 500 writes per transaction and per batch; stay below both. */
+/** Firestore allows 500 writes per transaction or batch. */
 const TRANSACTION_WRITE_LIMIT = 500;
-const BATCH_WRITE_LIMIT = 400;
-/** A single batch commits atomically, so imports of up to this size cannot be
- *  left half-written; bigger files fall back to several batches. */
-const IMPORT_BATCH_LIMIT = 499;
+// One batch commits atomically, so keeping it just under the limit means an
+// import of up to 499 rows cannot be left half-written.
+const BATCH_WRITE_LIMIT = 499;
 const CONVERSION_CONFLICT = "finnova/conversion-conflict";
 const CONVERSION_INCOMPLETE = "finnova/conversion-incomplete";
+const CONVERSION_OUT_OF_RANGE = "finnova/conversion-out-of-range";
 const EMPTY = {
   transactions: [] as Transaction[],
   budgets: [] as Budget[],
@@ -238,6 +239,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const database = db!;
         const accountRef = doc(database, "users", uid);
         const updates = amountUpdates({ transactions, budgets, goals, reminders }, from, to);
+        if (hasOutOfRangeAmount(updates)) {
+          throw Object.assign(
+            new Error(
+              `Converting to ${to} would store an amount outside the supported range (up to ${MAX_STORED_AMOUNT.toLocaleString("en-US")}). Nothing was changed. Choose a different currency or fix the affected amounts first.`,
+            ),
+            { code: CONVERSION_OUT_OF_RANGE },
+          );
+        }
         // One transaction can hold the currency claim plus every amount write
         // for all but very large accounts, which makes the whole conversion
         // all-or-nothing. The claim itself always runs first: if another device
@@ -288,7 +297,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       } catch (cause) {
         const code = (cause as { code?: string } | null)?.code;
-        if (code === CONVERSION_CONFLICT || code === CONVERSION_INCOMPLETE) throw cause;
+        if (
+          code === CONVERSION_CONFLICT ||
+          code === CONVERSION_INCOMPLETE ||
+          code === CONVERSION_OUT_OF_RANGE
+        ) {
+          throw cause;
+        }
         return fail(cause);
       }
     },
@@ -345,9 +360,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const uid = requireUid();
         const database = db!;
-        for (let index = 0; index < inputs.length; index += IMPORT_BATCH_LIMIT) {
+        for (let index = 0; index < inputs.length; index += BATCH_WRITE_LIMIT) {
           const batch = writeBatch(database);
-          inputs.slice(index, index + IMPORT_BATCH_LIMIT).forEach((input) => {
+          inputs.slice(index, index + BATCH_WRITE_LIMIT).forEach((input) => {
             batch.set(doc(collection(database, "transactions")), {
               ...input,
               ownerId: uid,

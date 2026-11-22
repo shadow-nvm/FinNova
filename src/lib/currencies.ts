@@ -245,6 +245,9 @@ export function conversionRate(from: string, to: string): number {
   return source.usd / target.usd;
 }
 
+/** Smallest amount the app stores: every amount keeps two decimals. */
+const MIN_MONEY_UNIT = 0.01;
+
 /** Rounds to two decimals, the precision every stored amount uses. */
 export function roundMoney(value: number): number {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -252,5 +255,10 @@ export function roundMoney(value: number): number {
 
 /** Converts an amount between currencies and rounds it like stored amounts. */
 export function convertAmount(value: number, from: string, to: string): number {
-  return roundMoney(Number(value || 0) * conversionRate(from, to));
+  const source = Number(value || 0);
+  const converted = roundMoney(source * conversionRate(from, to));
+  if (source === 0 || converted !== 0) return converted || 0;
+  // A tiny but real amount must not collapse to 0.00: zeroed transactions
+  // break the "amounts are positive" invariant (and the security rules).
+  return source > 0 ? MIN_MONEY_UNIT : -MIN_MONEY_UNIT;
 }

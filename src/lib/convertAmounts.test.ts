@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { amountUpdates, applyAmountUpdates, type AmountData } from "./convertAmounts";
+import {
+  amountUpdates,
+  applyAmountUpdates,
+  hasOutOfRangeAmount,
+  type AmountData,
+} from "./convertAmounts";
+import { MAX_STORED_AMOUNT } from "./constants";
 import type { Budget, Goal, Reminder, Transaction } from "../types";
 
 function transaction(id: string, amount: number): Transaction {
@@ -93,5 +99,63 @@ describe("applyAmountUpdates", () => {
     const same = applyAmountUpdates(data, amountUpdates(data, "INR", "INR"));
     expect(same.transactions[0].amount).toBe(1_000);
     expect(same).not.toBe(data);
+  });
+});
+
+describe("hasOutOfRangeAmount", () => {
+  it("accepts a normal conversion", () => {
+    expect(hasOutOfRangeAmount(amountUpdates(sample(), "INR", "USD"))).toBe(false);
+  });
+
+  it("flags transactions and budgets that would fall outside the stored range", () => {
+    expect(
+      hasOutOfRangeAmount([{ collection: "transactions", id: "t", data: { amount: -1 } }]),
+    ).toBe(true);
+    expect(
+      hasOutOfRangeAmount([
+        { collection: "transactions", id: "t", data: { amount: Number.NaN } },
+      ]),
+    ).toBe(true);
+    expect(
+      hasOutOfRangeAmount([
+        { collection: "transactions", id: "t", data: { amount: MAX_STORED_AMOUNT + 0.01 } },
+      ]),
+    ).toBe(true);
+    expect(
+      hasOutOfRangeAmount([{ collection: "budgets", id: "b", data: { amount: -0.01 } }]),
+    ).toBe(true);
+    expect(
+      hasOutOfRangeAmount([
+        { collection: "budgets", id: "b", data: { amount: MAX_STORED_AMOUNT * 2 } },
+      ]),
+    ).toBe(true);
+  });
+
+  it("allows an unchanged zero, which the update rules accept", () => {
+    expect(
+      hasOutOfRangeAmount([{ collection: "transactions", id: "t", data: { amount: 0 } }]),
+    ).toBe(false);
+  });
+
+  it("ignores goals and reminders, which have no storage cap", () => {
+    expect(
+      hasOutOfRangeAmount([
+        {
+          collection: "goals",
+          id: "g",
+          data: { targetAmount: MAX_STORED_AMOUNT * 2, savedAmount: 0 },
+        },
+        { collection: "reminders", id: "r", data: { amount: MAX_STORED_AMOUNT * 2 } },
+      ]),
+    ).toBe(false);
+  });
+
+  it("flags a real conversion that would exceed the cap", () => {
+    const data: AmountData = {
+      ...sample(),
+      transactions: [transaction("t1", 1_000_000_000)],
+      budgets: [],
+    };
+    expect(hasOutOfRangeAmount(amountUpdates(data, "INR", "IDR"))).toBe(true);
   });
 });

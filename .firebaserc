@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "finnova-fd6d5"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

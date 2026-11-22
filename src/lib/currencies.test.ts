@@ -59,6 +59,14 @@ describe("convertAmount", () => {
     expect(convertAmount(1000, "USD", "JPY")).toBe(151515.15);
   });
 
+  it("never rounds a real amount down to zero", () => {
+    // 1 IDR is far below one US cent, but a zeroed transaction is invalid.
+    expect(convertAmount(1, "IDR", "USD")).toBe(0.01);
+    expect(convertAmount(-1, "IDR", "USD")).toBe(-0.01);
+    expect(convertAmount(0.01, "VND", "USD")).toBe(0.01);
+    expect(convertAmount(0, "IDR", "USD")).toBe(0);
+  });
+
   it("keeps very large amounts finite", () => {
     const converted = convertAmount(1_000_000_000, "INR", "USD");
     expect(Number.isFinite(converted)).toBe(true);

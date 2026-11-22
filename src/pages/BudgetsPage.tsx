@@ -9,7 +9,7 @@ import {
   useToast,
 } from "../components/ui";
 import { budgetProgress, categoryTotals, inMonth, ofType } from "../lib/calc";
-import { CATEGORY_EMOJI, EXPENSE_CATEGORIES } from "../lib/constants";
+import { CATEGORY_EMOJI, EXPENSE_CATEGORIES, MAX_STORED_AMOUNT } from "../lib/constants";
 import { currencySymbol, lastMonthKeys, money, monthShort } from "../lib/format";
 import type { Budget } from "../types";
 import { useData } from "../store/DataProvider";
@@ -106,6 +106,10 @@ export function BudgetsPage() {
     const value = Number(form.amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError("Enter a valid monthly budget amount.");
+      return;
+    }
+    if (value > MAX_STORED_AMOUNT) {
+      setError(`Enter a budget of ${MAX_STORED_AMOUNT.toLocaleString("en-US")} or less.`);
       return;
     }
     setSaving(true);

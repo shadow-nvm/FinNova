@@ -72,3 +72,6 @@ export const NAV_ITEMS = [
 ] as const;
 
 export const MAX_REMINDER_DAY = 28;
+
+/** Largest transaction/budget amount `firestore.rules` accepts. */
+export const MAX_STORED_AMOUNT = 1_000_000_000;

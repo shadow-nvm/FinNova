@@ -1,10 +1,9 @@
 import type { Budget, Goal, Reminder, Transaction } from "../types";
+import { MAX_STORED_AMOUNT } from "./constants";
 import { dateInput, monthKeyOf } from "./format";
 
 /** A leading one of these makes spreadsheets treat a cell as a formula. */
 const FORMULA_START = /^[=+\-@\t\r]/;
-/** Limits enforced by `firestore.rules` for transactions. */
-const MAX_AMOUNT = 1_000_000_000;
 const MAX_CATEGORY_LENGTH = 40;
 
 function escapeCell(value: unknown): string {
@@ -147,6 +146,10 @@ function parseAmount(raw: string): number {
   return Number.isFinite(value) ? value : NaN;
 }
 
+/** Dates outside this range are almost certainly bad imports. */
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2100;
+
 /** Local noon on a valid calendar date, or null for impossible dates. */
 function localNoon(year: number, month: number, day: number): Date | null {
   const date = new Date(year, month - 1, day, 12);
@@ -161,13 +164,23 @@ function localNoon(year: number, month: number, day: number): Date | null {
   return date;
 }
 
+/** ISO string for a usable date, rejecting impossible or absurd years. */
+function storedDate(date: Date | null): string | null {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  return year >= MIN_YEAR && year <= MAX_YEAR ? date.toISOString() : null;
+}
+
 function parseDate(raw: string): string | null {
   const value = raw.trim();
   if (!value) return null;
   // ISO date or date-time, which is what FinNova and most trackers export.
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/.exec(value);
-  const isoDate = iso ? localNoon(Number(iso[1]), Number(iso[2]), Number(iso[3])) : null;
-  if (isoDate) return isoDate.toISOString();
+  if (iso) {
+    // Return here even when the date is impossible (2026-02-30): falling back
+    // to Date would roll it forward to March instead of reporting the row.
+    return storedDate(localNoon(Number(iso[1]), Number(iso[2]), Number(iso[3])));
+  }
   // Numeric day-first and month-first dates. Ambiguous values such as
   // 05/03/2026 are read day-first (the format this importer documents); a value
   // that can only be month-first (12/31/2026) is still accepted.
@@ -176,11 +189,9 @@ function parseDate(raw: string): string | null {
     let day = Number(numeric[1]);
     let month = Number(numeric[2]);
     if (month > 12 && day <= 12) [day, month] = [month, day];
-    const parsed = localNoon(Number(numeric[3]), month, day);
-    return parsed ? parsed.toISOString() : null;
+    return storedDate(localNoon(Number(numeric[3]), month, day));
   }
-  const fallback = new Date(value);
-  return Number.isNaN(fallback.getTime()) ? null : fallback.toISOString();
+  return storedDate(new Date(value));
 }
 
 /**
@@ -224,9 +235,9 @@ export function parseTransactionsCsv(input: string): CsvParseResult {
       errors.push(`Line ${line}: amount must be a positive number.`);
       return;
     }
-    if (amountValue > MAX_AMOUNT) {
+    if (amountValue > MAX_STORED_AMOUNT) {
       errors.push(
-        `Line ${line}: amount is above the ${MAX_AMOUNT.toLocaleString("en-US")} limit.`,
+        `Line ${line}: amount is above the ${MAX_STORED_AMOUNT.toLocaleString("en-US")} limit.`,
       );
       return;
     }

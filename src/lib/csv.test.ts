@@ -39,9 +39,26 @@ describe("parseTransactionsCsv", () => {
   });
 
   it("rejects impossible calendar dates instead of rolling them forward", () => {
-    const result = parseTransactionsCsv(`${HEADER}\n31/02/2026,expense,Food,100,Invalid`);
+    for (const value of ["31/02/2026", "2026-02-30"]) {
+      const result = parseTransactionsCsv(`${HEADER}\n${value},expense,Food,100,Invalid`);
+      expect(result.rows).toHaveLength(0);
+      expect(result.errors[0]).toContain("Line 2");
+    }
+  });
+
+  it("rejects absurd years such as raw Excel serial numbers", () => {
+    const result = parseTransactionsCsv(`${HEADER}\n45292,expense,Food,100,Serial`);
     expect(result.rows).toHaveLength(0);
-    expect(result.errors[0]).toContain("Line 2");
+    expect(result.errors).toHaveLength(1);
+  });
+
+  it("accepts dashed and named-date formats", () => {
+    const result = parseTransactionsCsv(
+      `${HEADER}\n05-03-2026,expense,Food,100,Dash\n"Aug 23, 2026",expense,Food,100,Text`,
+    );
+    expect(result.errors).toEqual([]);
+    expect(localDate(result.rows[0].date)).toEqual({ month: 2, day: 5 });
+    expect(localDate(result.rows[1].date)).toEqual({ month: 7, day: 23 });
   });
 
   it("reads decimal commas and both thousands conventions", () => {

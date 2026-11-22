@@ -1,4 +1,5 @@
 import { convertAmount } from "./currencies";
+import { MAX_STORED_AMOUNT } from "./constants";
 import type { Budget, Goal, Reminder, Transaction } from "../types";
 
 export type AmountCollection = "transactions" | "budgets" | "goals" | "reminders";
@@ -57,6 +58,20 @@ export function amountUpdates(data: AmountData, from: string, to: string): Amoun
     });
   }
   return updates;
+}
+
+/**
+ * True when a conversion would write a transaction or budget amount that
+ * `firestore.rules` rejects. Conversions are refused before any write so the
+ * account is never left half-converted. A zero amount is ignored because a
+ * conversion leaves it at zero and the update rules allow an unchanged amount.
+ */
+export function hasOutOfRangeAmount(updates: AmountUpdate[]): boolean {
+  return updates.some((update) => {
+    if (update.collection !== "transactions" && update.collection !== "budgets") return false;
+    const amount = update.data.amount;
+    return !Number.isFinite(amount) || amount < 0 || amount > MAX_STORED_AMOUNT;
+  });
 }
 
 /** Applies `amountUpdates` to the local data, leaving every other field alone. */

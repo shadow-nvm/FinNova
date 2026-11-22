@@ -90,6 +90,12 @@ firebase deploy --only firestore:rules
 > refused by Firestore (the conversion checks and updates the account document in the same
 > transaction). Demo mode is unaffected. Keep a backup (Reports → Full backup) before any bulk
 > operation you are unsure about.
+>
+> **Deploying the rules is required.** Run `firebase deploy --only firestore:rules` after pulling
+> this change. Updates re-check a transaction or budget amount only when the write changes it, so
+> records saved before the limit (including a legacy zero) stay editable without touching their
+> amount. Conversions that would push an amount over 1,000,000,000 are refused in the app with an
+> explanatory message before anything is written, rather than failing at the rules layer.
 
 ## Tests
 
@@ -101,10 +107,17 @@ npm run build     # typecheck + production bundle
 
 The currency conversion maths (`conversionRate`, `convertAmount`, `roundMoney`) is covered by
 `src/lib/currencies.test.ts`. `src/lib/convertAmounts.test.ts` checks which record fields hold
-money, that a goal's target and saved amounts are both converted, and that non-money fields
-survive a conversion. `src/lib/csv.test.ts` covers CSV import/export edge cases (BOM, date
+money, that a goal's target and saved amounts are both converted, that non-money fields survive a
+conversion, and that a conversion refuses amounts outside the range `firestore.rules` accepts. `src/lib/csv.test.ts` covers CSV import/export edge cases (BOM, date
 order, decimal commas, formula protection, rule limits) and `src/lib/calc.test.ts` covers goal
 day counting and the overdue-goal insight.
+
+### Dependency note
+
+`package.json` overrides `@grpc/grpc-js` to the patched 1.13.x line because the version
+Firestore pins has a published advisory. The browser bundle never includes gRPC (Firestore uses
+WebChannel in browsers); the package only serves Firestore's Node.js transport, which this app
+does not ship. Remove the override once Firebase itself depends on a patched version.
 
 ## CSV import format
 
