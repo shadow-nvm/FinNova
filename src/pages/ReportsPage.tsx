@@ -17,6 +17,7 @@ import {
   StatCard,
   useToast,
 } from "../components/ui";
+import { ChartTooltip } from "../components/ChartTooltip";
 import {
   categoryTotals,
   inMonth,
@@ -40,14 +41,6 @@ import {
 } from "../lib/format";
 import { fullBackupJson, monthCsv } from "../lib/csv";
 import { useData } from "../store/DataProvider";
-
-const TOOLTIP_STYLE = {
-  backgroundColor: "var(--card-solid)",
-  border: "1px solid var(--line)",
-  borderRadius: 10,
-  color: "var(--text)",
-  fontSize: 12,
-};
 
 export function ReportsPage() {
   const data = useData();
@@ -212,23 +205,22 @@ export function ReportsPage() {
               <CartesianGrid stroke="var(--line)" vertical={false} />
               <XAxis
                 dataKey="label"
-                stroke="#5b6a92"
-                tick={{ fontSize: 11 }}
+                stroke="var(--line)"
+                tick={{ fontSize: 11, fill: "var(--muted)" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                stroke="#5b6a92"
-                tick={{ fontSize: 11 }}
+                stroke="var(--line)"
+                tick={{ fontSize: 11, fill: "var(--muted)" }}
                 axisLine={false}
                 tickLine={false}
                 width={52}
                 tickFormatter={compactMoney}
               />
               <Tooltip
-                contentStyle={TOOLTIP_STYLE}
+                content={(props) => <ChartTooltip {...props} formatValue={money} />}
                 cursor={{ fill: "rgba(148, 170, 220, 0.08)", radius: 8 }}
-                formatter={(value) => money(Number(value))}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar

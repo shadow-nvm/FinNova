@@ -10,7 +10,8 @@
   --line: rgba(148, 170, 220, 0.19);
   --text: #eef1fa;
   --muted: #9fadd0;
-  --faint: #7383a8;
+  /* --faint carries 11–12px meta text, so it stays above 4.5:1 on the cards. */
+  --faint: #7d8cb0;
   --brand: #7c5cff;
   --brand-2: #22d3ee;
   --grad: linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%);
@@ -37,7 +38,7 @@
   --line: rgba(20, 34, 66, 0.14);
   --text: #101a33;
   --muted: #55637f;
-  --faint: #7f8da6;
+  --faint: #66748d;
   --brand: #6d4dff;
   --brand-2: #0e9fbd;
   --green: #0f8f65;
@@ -2858,12 +2859,83 @@ textarea:focus {
 
 .recharts-tooltip-wrapper {
   outline: none;
+  /* Above the glass cards so the tooltip is never dimmed by a sibling layer. */
+  z-index: 12;
+}
+
+/* Themed tooltip content (see components/ChartTooltip.tsx). Text always uses
+   the current theme tokens, so it stays readable in dark and light mode. */
+.chart-tooltip {
+  min-width: 142px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card-solid);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 48px -24px rgba(0, 0, 0, 0.75);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+:root[data-theme="light"] .chart-tooltip {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 22px 44px -26px rgba(23, 36, 66, 0.45);
+}
+
+.chart-tooltip-label {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-tooltip-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(148, 170, 220, 0.16);
+}
+
+.chart-tooltip-name {
+  color: var(--muted);
+}
+
+.chart-tooltip-value {
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .recharts-default-tooltip {
   box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.85);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
+  /* Recharts colourises rows from the series colour and falls back to black,
+     which is invisible on the dark surface. Keep any default tooltip on theme
+     tokens; the custom tooltip above keeps the series colour in its swatch. */
+  background-color: var(--card-solid) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text) !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item,
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: var(--text) !important;
 }
 
 .recharts-tooltip-item {

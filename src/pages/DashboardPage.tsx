@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAuth } from "../auth/AuthProvider";
+import { ChartTooltip } from "../components/ChartTooltip";
 import { TransactionModal } from "../components/TransactionModal";
 import {
   AnimatedMoney,
@@ -79,14 +80,6 @@ function ActiveSlice({ cx = 0, cy = 0, innerRadius = 0, outerRadius = 0, startAn
     />
   );
 }
-
-const TOOLTIP_STYLE = {
-  backgroundColor: "var(--card-solid)",
-  border: "1px solid var(--line)",
-  borderRadius: 10,
-  color: "var(--text)",
-  fontSize: 12,
-};
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -217,23 +210,20 @@ export function DashboardPage() {
                 <CartesianGrid stroke="var(--line)" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  stroke="#5b6a92"
-                  tick={{ fontSize: 11 }}
+                  stroke="var(--line)"
+                  tick={{ fontSize: 11, fill: "var(--muted)" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  stroke="#5b6a92"
-                  tick={{ fontSize: 11 }}
+                  stroke="var(--line)"
+                  tick={{ fontSize: 11, fill: "var(--muted)" }}
                   axisLine={false}
                   tickLine={false}
                   width={52}
                   tickFormatter={compactMoney}
                 />
-                <Tooltip
-                  contentStyle={TOOLTIP_STYLE}
-                  formatter={(value) => money(Number(value))}
-                />
+                <Tooltip content={(props) => <ChartTooltip {...props} formatValue={money} />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Area
                   type="monotone"
@@ -246,7 +236,7 @@ export function DashboardPage() {
                   animationBegin={0}
                   animationDuration={1500}
                   animationEasing="ease-out"
-                  activeDot={{ r: 5, strokeWidth: 3, stroke: "rgba(7,11,23,0.85)" }}
+                  activeDot={{ r: 5, strokeWidth: 3, stroke: "var(--card-solid)" }}
                 />
                 <Area
                   type="monotone"
@@ -259,7 +249,7 @@ export function DashboardPage() {
                   animationBegin={220}
                   animationDuration={1500}
                   animationEasing="ease-out"
-                  activeDot={{ r: 5, strokeWidth: 3, stroke: "rgba(7,11,23,0.85)" }}
+                  activeDot={{ r: 5, strokeWidth: 3, stroke: "var(--card-solid)" }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -343,7 +333,7 @@ export function DashboardPage() {
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => money(Number(value))} />
+                  <Tooltip content={(props) => <ChartTooltip {...props} formatValue={money} />} />
                   <Legend iconType="circle" verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
                 </PieChart>
               </ResponsiveContainer>

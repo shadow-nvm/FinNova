@@ -242,8 +242,11 @@ export function AnimatedMoney({ value, duration = 900 }: { value: number; durati
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const from = shownRef.current;
     const target = Number.isFinite(value) ? value : 0;
+    // A background tab gets no animation frames, so a count-up started there
+    // would sit on "0" until the tab is shown. Snap instead.
+    const hidden = typeof document !== "undefined" && document.hidden;
 
-    if (reduce || Math.abs(target - from) < 1) {
+    if (reduce || hidden || Math.abs(target - from) < 1) {
       shownRef.current = target;
       setShown(target);
       return;

@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -76,20 +75,25 @@ function makeId(prefix: string): string {
 export function PaperProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const storageKey = storageKeyFor(user?.id);
-  const loadedKey = useRef(storageKey);
+  // The storage key the in-memory account belongs to. This lives in state (not
+  // a ref) so the account and its key change in the same render: with a ref,
+  // the save effect could write the previous user's portfolio into the new
+  // user's slot before the freshly loaded account was committed.
+  const [loadedKey, setLoadedKey] = useState(storageKey);
   const [account, setAccount] = useState<PaperAccount>(() => loadAccount(storageKey));
 
-  // Sign-in or a different account loads its own practice portfolio.
-  useEffect(() => {
-    if (loadedKey.current === storageKey) return;
-    loadedKey.current = storageKey;
+  // Sign-in or a different account loads its own practice portfolio. Updating
+  // state during render makes React re-render before effects run, so nothing
+  // observes an account from the previous key.
+  if (loadedKey !== storageKey) {
+    setLoadedKey(storageKey);
     setAccount(loadAccount(storageKey));
-  }, [storageKey]);
+  }
 
   useEffect(() => {
-    if (loadedKey.current !== storageKey) return;
+    if (loadedKey !== storageKey) return;
     saveAccount(storageKey, account);
-  }, [account, storageKey]);
+  }, [account, storageKey, loadedKey]);
 
   const buy = useCallback<PaperContextValue["buy"]>(
     (asset, amountInput, price, stop, target) => {
