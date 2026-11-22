@@ -78,6 +78,12 @@ export function friendlyError(err: unknown): string {
       return "Network problem — check your internet connection and try again.";
     case "auth/requires-recent-login":
       return "For security, please sign in again before making this change.";
+    case "auth/operation-not-allowed":
+      return "Email/password sign-in is not enabled for this Firebase project yet. Enable it in Firebase Console → Authentication → Sign-in method.";
+    case "auth/unauthorized-domain":
+      return "This domain is not authorised for Firebase sign-in. Add it in Firebase Console → Authentication → Settings → Authorised domains.";
+    case "auth/invalid-api-key":
+      return "The Firebase API key is not valid for this project. Check the Firebase web config.";
     case "permission-denied":
       return "Firebase refused the request. Make sure you are signed in and the latest security rules are deployed (firebase deploy --only firestore:rules).";
     case "unauthenticated":

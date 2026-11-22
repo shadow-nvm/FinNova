@@ -15,12 +15,14 @@ import {
   doc,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
 import { useAuth } from "../auth/AuthProvider";
+import { convertAmount } from "../lib/currencies";
 import { db, firebaseEnabled, friendlyError } from "../lib/firebase";
 import { normalizeDate } from "../lib/format";
 import type {
@@ -66,6 +68,8 @@ interface DataContextValue extends AppData {
   addReminder: (input: ReminderInput) => Promise<void>;
   updateReminder: (id: string, patch: Partial<ReminderInput>) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
+  /** Converts every stored amount from one currency to another. */
+  convertCurrency: (from: string, to: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -141,6 +145,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
+  const { transactions, budgets, goals, reminders } = isDemo ? demoData : remote;
 
   // The demo workspace is lazy: seeding happens only if it is actually opened.
   useEffect(() => {
@@ -212,6 +217,77 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setRemote(EMPTY);
     setRetryToken((token) => token + 1);
   }, []);
+
+  const convertCurrency = useCallback(
+    async (from: string, to: string) => {
+      if (from === to) return;
+      if (isDemo) {
+        demoStore.convertAmounts(from, to);
+        return;
+      }
+      try {
+        const uid = requireUid();
+        const database = db!;
+        const accountRef = doc(database, "users", uid);
+
+        // Claim the conversion on the account before touching any amounts. If
+        // another device already recorded a different stored currency, stop:
+        // converting again would scale the data a second time.
+        await runTransaction(database, async (transaction) => {
+          const account = await transaction.get(accountRef);
+          const stored = account.data()?.storedCurrency;
+          if (typeof stored === "string" && stored !== from) {
+            throw Object.assign(
+              new Error(
+                `Your account already stores amounts in ${stored}, so this conversion was skipped to avoid converting twice.`,
+              ),
+              { code: "finnova/conversion-conflict" },
+            );
+          }
+          transaction.set(
+            accountRef,
+            { storedCurrency: to, updatedAt: serverTimestamp() },
+            { merge: true },
+          );
+        });
+
+        const convert = (value: unknown) => convertAmount(Number(value || 0), from, to);
+        const updates: { path: string; data: Record<string, number> }[] = [];
+        transactions.forEach((tx) =>
+          updates.push({ path: `transactions/${tx.id}`, data: { amount: convert(tx.amount) } }),
+        );
+        budgets.forEach((budget) =>
+          updates.push({ path: `budgets/${budget.id}`, data: { amount: convert(budget.amount) } }),
+        );
+        goals.forEach((goal) =>
+          updates.push({
+            path: `goals/${goal.id}`,
+            data: {
+              targetAmount: convert(goal.targetAmount),
+              savedAmount: convert(goal.savedAmount),
+            },
+          }),
+        );
+        reminders.forEach((reminder) =>
+          updates.push({
+            path: `reminders/${reminder.id}`,
+            data: { amount: convert(reminder.amount) },
+          }),
+        );
+        for (let index = 0; index < updates.length; index += 400) {
+          const batch = writeBatch(database);
+          updates.slice(index, index + 400).forEach((update) => {
+            batch.update(doc(database, update.path), update.data);
+          });
+          await batch.commit();
+        }
+      } catch (cause) {
+        if ((cause as { code?: string } | null)?.code === "finnova/conversion-conflict") throw cause;
+        return fail(cause);
+      }
+    },
+    [isDemo, requireUid, transactions, budgets, goals, reminders, fail],
+  );
 
   const addTransaction = useCallback(
     async (input: TxInput) => {
@@ -435,6 +511,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addReminder,
       updateReminder,
       deleteReminder,
+      convertCurrency,
     }),
     [
       isDemo,
@@ -458,6 +535,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addReminder,
       updateReminder,
       deleteReminder,
+      convertCurrency,
     ],
   );
 

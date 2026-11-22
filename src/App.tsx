@@ -8,8 +8,10 @@ import { GoalsPage } from "./pages/GoalsPage";
 import { LearnPage } from "./pages/LearnPage";
 import { RemindersPage } from "./pages/RemindersPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { DataProvider } from "./store/DataProvider";
+import { SettingsProvider } from "./store/SettingsProvider";
 import { ToastProvider } from "./components/ui";
 
 function BootSplash() {
@@ -42,22 +44,25 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <DataProvider>
-          <Routes>
-            <Route path="/auth" element={<AuthRoute />} />
-            <Route path="/" element={<RequireAuth />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="transactions" element={<TransactionsPage />} />
-              <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="goals" element={<GoalsPage />} />
-              <Route path="reminders" element={<RemindersPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="learn" element={<LearnPage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </DataProvider>
+        <SettingsProvider>
+          <DataProvider>
+            <Routes>
+              <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/" element={<RequireAuth />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="transactions" element={<TransactionsPage />} />
+                <Route path="budgets" element={<BudgetsPage />} />
+                <Route path="goals" element={<GoalsPage />} />
+                <Route path="reminders" element={<RemindersPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="learn" element={<LearnPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </DataProvider>
+        </SettingsProvider>
       </AuthProvider>
     </ToastProvider>
   );

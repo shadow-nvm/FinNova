@@ -52,7 +52,9 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100%;
-  overflow-x: hidden;
+  /* `clip` keeps horizontal overflow in check without creating a scroll
+     container, which would break the sticky mobile header. */
+  overflow-x: clip;
 }
 
 body {
@@ -212,11 +214,16 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 6px;
   z-index: 40;
+  overflow-y: auto;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
 .mobile-topbar {
+  display: none;
+}
+
+.mobile-head {
   display: none;
 }
 
@@ -393,6 +400,39 @@ textarea:focus-visible {
   font-size: 0.86rem;
 }
 
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(251, 191, 36, 0.14);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.4);
+  color: var(--amber);
+  padding: 9px 18px;
+  font-size: 0.82rem;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.banner-retry {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid currentColor;
+  color: inherit;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.banner-retry:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 :root[data-theme="light"] .data-error-banner {
   color: #9f1239;
 }
@@ -409,6 +449,16 @@ textarea:focus-visible {
   line-height: 1;
   flex-shrink: 0;
   padding: 0 4px;
+}
+
+.data-error-banner .banner-retry {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid currentColor;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 4px 10px;
+  border-radius: 8px;
 }
 
 /* --------------------------------- Cards ---------------------------------- */
@@ -1405,6 +1455,185 @@ textarea:focus-visible {
 
 /* --------------------------------- Toasts --------------------------------- */
 
+/* ------------------------------- Settings -------------------------------- */
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--faint);
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.currency-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.rate-note {
+  font-size: 0.78rem;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+.sync-note {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--brand-2);
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.sync-note.error {
+  color: var(--amber);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.sync-note code {
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.settings-note {
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.convert-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card-2);
+  padding: 14px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.convert-rate {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.settings-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.setting-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.setting-sub {
+  font-size: 0.8rem;
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.settings-user {
+  padding: 0;
+}
+
+.region-badge {
+  text-decoration: none;
+  display: block;
+  text-align: center;
+}
+
+.region-badge:hover {
+  color: var(--text);
+}
+
+.suggest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.suggest-row.on {
+  border-color: var(--brand);
+  background: rgba(124, 92, 255, 0.1);
+}
+
+.suggest-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  flex-shrink: 0;
+}
+
+.suggest-emoji {
+  font-size: 1rem;
+}
+
+.suggest-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.suggest-spent {
+  font-size: 0.78rem;
+}
+
+.suggest-amount {
+  margin-left: auto;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .suggest-spent {
+    display: none;
+  }
+  .preview-line {
+    font-size: 0.86rem;
+  }
+}
+
 .toast-stack {
   position: fixed;
   right: 18px;
@@ -1528,6 +1757,44 @@ textarea:focus-visible {
   }
 }
 
+/* ------------------------------ Crash screen ------------------------------- */
+
+.crash-wrap {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.crash-card {
+  width: 100%;
+  max-width: 460px;
+  text-align: center;
+}
+
+.crash-emoji {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.crash-title {
+  font-size: 1.35rem;
+  margin-bottom: 8px;
+}
+
+.crash-text {
+  font-size: 0.9rem;
+  margin: 0 0 18px;
+}
+
+.crash-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 720px) {
   .cols-4,
   .cols-3,
@@ -1546,18 +1813,26 @@ textarea:focus-visible {
   .sidebar {
     display: none;
   }
+  .mobile-head {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    background: var(--topbar);
+    border-bottom: 1px solid var(--line);
+    padding-top: env(safe-area-inset-top, 0px);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
   .mobile-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
     padding: 10px 14px;
-    background: var(--topbar);
-    border-bottom: 1px solid var(--line);
-    padding-top: calc(10px + env(safe-area-inset-top, 0px));
-    position: sticky;
-    top: 0;
-    z-index: 35;
+    background: transparent;
+    border-bottom: none;
+    position: static;
   }
   .mt-brand {
     display: flex;
@@ -1590,17 +1865,13 @@ textarea:focus-visible {
   }
   .mb-nav {
     display: flex;
-    position: sticky;
-    top: 0;
-    z-index: 30;
+    position: static;
     gap: 4px;
-    padding: 10px 12px;
-    background: var(--topbar);
-    border-bottom: 1px solid var(--line);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    padding: 8px 12px 10px;
+    background: transparent;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
   .mb-nav::-webkit-scrollbar {
     display: none;
@@ -1680,6 +1951,14 @@ textarea:focus-visible {
   .data-error-banner {
     font-size: 0.8rem;
     padding: 10px 14px;
+    gap: 8px;
+  }
+  .offline-banner {
+    font-size: 0.78rem;
+    padding: 8px 14px;
+  }
+  .crash-actions .btn {
+    flex: 1;
   }
 }
 

@@ -8,16 +8,27 @@ import {
   ProgressBar,
   useToast,
 } from "../components/ui";
-import { budgetProgress } from "../lib/calc";
+import { budgetProgress, categoryTotals, inMonth, ofType } from "../lib/calc";
 import { CATEGORY_EMOJI, EXPENSE_CATEGORIES } from "../lib/constants";
-import { money } from "../lib/format";
+import { currencySymbol, lastMonthKeys, money, monthShort } from "../lib/format";
 import type { Budget } from "../types";
 import { useData } from "../store/DataProvider";
+
+/** Rounds a spend figure up to a friendly budget limit (e.g. 9,640 → 10,000). */
+function niceLimit(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const step = magnitude / 2;
+  return Math.ceil(value / step) * step;
+}
 
 export function BudgetsPage() {
   const data = useData();
   const notify = useToast();
   const [open, setOpen] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [suggestBusy, setSuggestBusy] = useState(false);
   const [editing, setEditing] = useState<Budget | null>(null);
   const [form, setForm] = useState({ category: "Food", amount: "" });
   const [error, setError] = useState("");
@@ -33,6 +44,48 @@ export function BudgetsPage() {
   const totalSpent = progress.reduce((total, budget) => total + budget.spent, 0);
   const usedPct = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
   const usedCategories = new Set(data.budgets.map((budget) => budget.category));
+
+  const lastMonth = lastMonthKeys(2)[0];
+  const suggestions = useMemo(
+    () =>
+      Object.entries(
+        categoryTotals(ofType(inMonth(data.transactions, lastMonth), "expense")),
+      )
+        .filter(([category]) => !data.budgets.some((budget) => budget.category === category))
+        .map(([category, spent]) => ({ category, spent, suggested: niceLimit(spent) }))
+        .sort((a, b) => b.spent - a.spent)
+        .slice(0, 6),
+    [data.transactions, data.budgets, lastMonth],
+  );
+
+  const openSuggest = () => {
+    setChosen(new Set(suggestions.map((item) => item.category)));
+    setSuggestOpen(true);
+  };
+
+  const addSuggestions = async () => {
+    const picks = suggestions.filter((item) => chosen.has(item.category));
+    if (picks.length === 0) {
+      notify("Pick at least one category.", "info");
+      return;
+    }
+    setSuggestBusy(true);
+    try {
+      for (const pick of picks) {
+        await data.addBudget({
+          category: pick.category,
+          amount: pick.suggested,
+          period: "monthly",
+        });
+      }
+      notify(`${picks.length} budget${picks.length === 1 ? "" : "s"} created from last month's spending.`);
+      setSuggestOpen(false);
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : "Could not create the budgets.", "error");
+    } finally {
+      setSuggestBusy(false);
+    }
+  };
 
   const startCreate = () => {
     const firstFree = EXPENSE_CATEGORIES.find((category) => !usedCategories.has(category));
@@ -99,9 +152,24 @@ export function BudgetsPage() {
           totalLimit > 0 ? ` · ${usedPct}%` : ""
         }`}
         actions={
-          <button className="btn btn-primary" onClick={startCreate} type="button">
-            + Add budget
-          </button>
+          <div className="page-actions">
+            <button
+              className="btn"
+              onClick={openSuggest}
+              type="button"
+              disabled={suggestions.length === 0}
+              title={
+                suggestions.length === 0
+                  ? "No unbudgeted categories with spending last month"
+                  : "Create budgets from last month's spending"
+              }
+            >
+              ✨ Suggest from {monthShort(lastMonth)}
+            </button>
+            <button className="btn btn-primary" onClick={startCreate} type="button">
+              + Add budget
+            </button>
+          </div>
         }
       />
 
@@ -209,7 +277,7 @@ export function BudgetsPage() {
               <div className="field">
                 <label htmlFor="budget-amount">Monthly limit</label>
                 <div className="input-split">
-                  <span className="pre">₹</span>
+                  <span className="pre">{currencySymbol()}</span>
                   <input
                     id="budget-amount"
                     type="number"
@@ -241,6 +309,59 @@ export function BudgetsPage() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {suggestOpen && (
+        <Modal title={`Suggested budgets for ${monthShort(lastMonth)}`} onClose={() => setSuggestOpen(false)}>
+          <div className="muted" style={{ marginBottom: 14, fontSize: "0.9rem" }}>
+            Based on what you actually spent last month. Edit any limit afterwards.
+          </div>
+          <div className="suggest-list">
+            {suggestions.map((item) => {
+              const active = chosen.has(item.category);
+              return (
+                <label key={item.category} className={`suggest-row${active ? " on" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={() =>
+                      setChosen((current) => {
+                        const next = new Set(current);
+                        if (next.has(item.category)) next.delete(item.category);
+                        else next.add(item.category);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="suggest-emoji" aria-hidden="true">
+                    {CATEGORY_EMOJI[item.category] || "📦"}
+                  </span>
+                  <span className="suggest-name">{item.category}</span>
+                  <span className="muted suggest-spent">spent {money(item.spent)}</span>
+                  <span className="suggest-amount">{money(item.suggested)}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="form-actions">
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setSuggestOpen(false)}
+              disabled={suggestBusy}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => void addSuggestions()}
+              disabled={suggestBusy || chosen.size === 0}
+            >
+              {suggestBusy ? "Creating…" : `Create ${chosen.size} budget${chosen.size === 1 ? "" : "s"}`}
+            </button>
+          </div>
         </Modal>
       )}
 

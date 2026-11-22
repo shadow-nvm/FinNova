@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { money } from "../lib/format";
 
 /* ---------------------------------- Toasts --------------------------------- */
 
@@ -247,16 +248,10 @@ export function LoadingPage() {
 /* ------------------------------ Money display ------------------------------ */
 
 export function Money({ value, signed = false }: { value: number; signed?: boolean }) {
-  const formatted = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(value));
   return (
     <span className={value < 0 ? "neg" : signed ? "pos" : undefined}>
       {value < 0 ? "−" : signed ? "+" : ""}
-      {formatted}
+      {money(Math.abs(value))}
     </span>
   );
 }

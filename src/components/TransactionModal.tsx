@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../lib/constants";
-import { todayInput } from "../lib/format";
+import { currencySymbol, todayInput } from "../lib/format";
 import type { Transaction, TxInput, TxType } from "../types";
 import { Modal } from "./ui";
 
@@ -25,11 +25,14 @@ function blankDraft(type: TxType = "expense"): Draft {
 export function TransactionModal({
   open,
   initial,
+  duplicate,
   onClose,
   onSave,
 }: {
   open: boolean;
   initial?: Transaction | null;
+  /** Prefills a brand-new transaction (used by "Copy"). */
+  duplicate?: Transaction | null;
   onClose: () => void;
   onSave: (input: TxInput) => Promise<void>;
 }) {
@@ -50,10 +53,18 @@ export function TransactionModal({
         date: (initial.date || todayInput()).slice(0, 10),
         note: initial.note || "",
       });
+    } else if (duplicate) {
+      setDraft({
+        type: duplicate.type,
+        category: duplicate.category,
+        amount: String(duplicate.amount ?? ""),
+        date: todayInput(),
+        note: duplicate.note || "",
+      });
     } else {
       setDraft(blankDraft());
     }
-  }, [open, initial]);
+  }, [open, initial, duplicate]);
 
   useEffect(() => {
     if (open) {
@@ -67,6 +78,10 @@ export function TransactionModal({
 
   const update = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
   const categories = draft.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  // Keep categories that came from older data selectable instead of silently
+  // showing (and later saving) the first option in the list.
+  const options: string[] = [...categories];
+  if (draft.category && !options.includes(draft.category)) options.unshift(draft.category);
 
   const submit = async () => {
     const value = Number(draft.amount);
@@ -129,7 +144,7 @@ export function TransactionModal({
           <div className="field">
             <label htmlFor="tx-amount">Amount</label>
             <div className="input-split">
-              <span className="pre">₹</span>
+              <span className="pre">{currencySymbol()}</span>
               <input
                 id="tx-amount"
                 ref={amountRef}
@@ -151,7 +166,7 @@ export function TransactionModal({
               value={draft.category}
               onChange={(event) => update({ category: event.target.value })}
             >
-              {categories.map((category) => (
+              {options.map((category) => (
                 <option key={category} value={category}>
                   {category}
                 </option>

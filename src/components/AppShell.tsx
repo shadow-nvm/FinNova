@@ -1,38 +1,34 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { NAV_ITEMS } from "../lib/constants";
+import { activeCurrencyCode, countryByCode } from "../lib/currencies";
 import { initials } from "../lib/format";
 import { useData } from "../store/DataProvider";
+import { useSettings } from "../store/SettingsProvider";
 
-const THEME_KEY = "finnova_theme";
-type Theme = "dark" | "light";
-
-function readTheme(): Theme {
-  try {
-    return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
-  } catch {
-    return "dark";
-  }
-}
-
-function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    /* ignore */
-  }
+function useOnlineStatus(): boolean {
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
 }
 
 export function AppShell() {
-  const { user, mode, logout } = useAuth();
-  const { error, clearError } = useData();
-  const [theme, setTheme] = useState<Theme>(readTheme);
-
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+  const { user, logout, isDemo } = useAuth();
+  const { error, clearError, retry, fromCache } = useData();
+  const { theme, setTheme, country } = useSettings();
+  const online = useOnlineStatus();
+  const region = countryByCode(country);
 
   const navLinks = NAV_ITEMS.map((item) => (
     <NavLink
@@ -77,8 +73,16 @@ export function AppShell() {
           </button>
 
           <div className="mode-badge">
-            {mode === "firebase" ? "🔐 Firebase sync enabled" : "Demo mode · local data"}
+            {isDemo
+              ? "Demo mode · local data"
+              : fromCache
+                ? "📴 Offline cache · will sync"
+                : "🔐 Firestore synced"}
           </div>
+
+          <Link className="mode-badge region-badge" to="/settings">
+            {region ? `${region.flag} ${region.name}` : country} · {activeCurrencyCode()}
+          </Link>
 
           <div className="user-chip">
             <div className="avatar">{initials(user?.name)}</div>
@@ -97,44 +101,60 @@ export function AppShell() {
         </div>
       </aside>
 
-      <header className="mobile-topbar">
-        <div className="mt-brand">
-          <span className="logo" aria-hidden="true">
-            💠
-          </span>
-          <span>FinNova</span>
-        </div>
-        <div className="mt-actions">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? "🌙" : "☀️"}
-          </button>
-          <span className="avatar">{initials(user?.name)}</span>
-          <button
-            className="btn btn-sm btn-danger mt-signout"
-            onClick={() => void logout()}
-            type="button"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      {/* One sticky block on phones so the bar and the tab strip never overlap. */}
+      <div className="mobile-head">
+        <header className="mobile-topbar">
+          <div className="mt-brand">
+            <span className="logo" aria-hidden="true">
+              💠
+            </span>
+            <span>FinNova</span>
+          </div>
+          <div className="mt-actions">
+            <Link className="icon-btn" to="/settings" aria-label="Settings">
+              ⚙️
+            </Link>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? "🌙" : "☀️"}
+            </button>
+            <span className="avatar">{initials(user?.name)}</span>
+            <button
+              className="btn btn-sm btn-danger mt-signout"
+              onClick={() => void logout()}
+              type="button"
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
 
-      <nav className="mb-nav" aria-label="Main">
-        {navLinks}
-      </nav>
+        <nav className="mb-nav" aria-label="Main">
+          {navLinks}
+        </nav>
+      </div>
 
       <main className="main">
+        {!online && (
+          <div className="offline-banner" role="status">
+            <span>📡 You're offline — showing saved data. Changes sync when you reconnect.</span>
+          </div>
+        )}
         {error && (
           <div className="data-error-banner" role="alert">
             <span>⚠️ {error}</span>
-            <button onClick={clearError} aria-label="Dismiss warning">
-              ×
-            </button>
+            <div className="banner-actions">
+              <button className="banner-retry" onClick={retry} type="button">
+                Retry
+              </button>
+              <button onClick={clearError} aria-label="Dismiss warning" type="button">
+                ×
+              </button>
+            </div>
           </div>
         )}
         <Outlet />

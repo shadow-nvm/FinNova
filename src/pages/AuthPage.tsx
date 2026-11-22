@@ -6,7 +6,7 @@ import { firebaseEnabled } from "../lib/firebase";
 type Tab = "login" | "signup";
 
 export function AuthPage() {
-  const { user, authReady, login, signup, resetPassword, startDemo } = useAuth();
+  const { user, authReady, login, signup, resetPassword, startDemo, demoEnabled } = useAuth();
   const [tab, setTab] = useState<Tab>("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -167,13 +167,17 @@ export function AuthPage() {
         )}
 
 
-        <div className="auth-divider">
-          <span>or</span>
-        </div>
+        {demoEnabled && (
+          <>
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
 
-        <button className="btn btn-block" type="button" onClick={startDemo}>
-          ✨ Explore the demo (no account needed)
-        </button>
+            <button className="btn btn-block" type="button" onClick={startDemo}>
+              ✨ Explore the demo (no account needed)
+            </button>
+          </>
+        )}
 
         <div className="note-line">
           {firebaseEnabled

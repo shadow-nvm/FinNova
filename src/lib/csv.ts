@@ -110,7 +110,19 @@ function findKey(headers: string[], candidates: string[]): number {
 }
 
 function parseAmount(raw: string): number {
-  const cleaned = raw.replace(/[₹$€£,\s]/g, "");
+  // Strip any currency symbol, spaces and thousands separators, so exports
+  // from another currency or locale still import cleanly.
+  let cleaned = raw.replace(/[^\d.,-]/g, "");
+  if (cleaned.includes(".") && cleaned.includes(",")) {
+    // 1.234,56 (European) vs 1,234.56 (US): keep the rightmost separator.
+    if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (cleaned.includes(",")) {
+    cleaned = cleaned.replace(/,/g, "");
+  }
   const value = Number(cleaned);
   return Number.isFinite(value) ? value : NaN;
 }

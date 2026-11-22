@@ -68,6 +68,7 @@ export const NAV_ITEMS = [
   { to: "/reminders", label: "Reminders", icon: "🔔" },
   { to: "/reports", label: "Reports", icon: "📈" },
   { to: "/learn", label: "Learn", icon: "📚" },
+  { to: "/settings", label: "Settings", icon: "⚙️" },
 ] as const;
 
 export const MAX_REMINDER_DAY = 28;

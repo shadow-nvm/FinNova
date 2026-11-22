@@ -9,16 +9,26 @@ goals and reminders are still there after deploying.
 - **Auth** — email/password login, account creation, "forgot password" reset, session persistence.
 - **Dashboard** — monthly and all-time stats, 6-month income vs spending chart, category
   donut, budget/goal/upcoming summaries, recent activity, personalised insights.
-- **Transactions** — add/edit/delete, filters (type, month, search), sorting, month grouping,
-  **CSV import** and **CSV export**.
-- **Budgets** — per-category monthly limits with usage bars and over-budget warnings.
-- **Goals** — create/edit/delete, deposit or withdraw any amount, target dates and monthly pace.
+- **Transactions** — add/edit/delete, duplicate (“Copy”), filters (type, month, search), sorting,
+  month grouping, **CSV import** and **CSV export**.
+- **Budgets** — per-category monthly limits with usage bars and over-budget warnings, plus
+  **suggested budgets** built from last month's actual spending.
+- **Goals** — create/edit/delete, deposit or withdraw any amount, target dates, monthly pace and
+  quick-deposit chips scaled to the goal.
 - **Reminders** — recurring bills and savings nudges, next due date, "mark paid".
+- **Settings** — pick a **country** and the app switches to its currency; every amount, chart,
+  budget, goal, reminder and export follows that choice. You can override the currency and ask
+  the app to **convert existing amounts** at the built-in reference rate. FinNova stores which
+  currency the amounts are actually in on your account (`users/{uid}`), so the conversion offer
+  follows you across devices and a second device cannot convert the same data twice. The theme
+  stays a per-device preference.
 - **Reports** — month selector, 6-month comparison table and chart, category breakdown,
   largest expenses, month CSV export and a **full JSON backup**.
 - **Learn** — 12 financial-literacy articles with search and categories.
-- **Extras** — light/dark theme, mobile bottom navigation, toast notifications, offline
-  Firestore cache, confirm dialogs before deletes, accessible dialogs and forms, demo mode.
+- **Extras** — light/dark theme, sticky mobile header and tab strip, toast notifications,
+  offline Firestore cache with an offline banner, retry on sync errors, a crash screen that
+  never leaves a blank page, confirm dialogs before deletes, accessible dialogs and forms,
+  and a development-only demo mode.
 
 ## Data model (matches the original app)
 
@@ -30,9 +40,14 @@ Top-level Firestore collections, each document owned by `ownerId = <firebase uid
 | `budgets` | `ownerId`, `category`, `amount`, `period: "monthly"`, `createdAt` |
 | `goals` | `ownerId`, `name`, `icon`, `targetAmount`, `savedAmount`, `targetDate`, `createdAt` |
 | `reminders` | `ownerId`, `type` (`bill`/`saving`), `title`, `amount`, `day`, `lastPaidDate`, `createdAt` |
+| `users` | one document per account, id = uid: `country`, `currency`, `storedCurrency`, `updatedAt` |
 
 Because the field names did not change, the new app reads every existing document. Nothing
 is migrated or rewritten automatically.
+
+Amounts are stored as plain numbers. Country/currency is a display preference saved on the
+device (like the theme), so choosing a currency never changes stored data by itself — the app
+offers an explicit conversion in **Settings** when you actually want amounts rewritten.
 
 ## Run locally
 
@@ -49,8 +64,9 @@ To preview the demo directly: `http://localhost:5173/?demo=1`.
 ```bash
 npm install
 npm run build
-firebase login          # once, if not already signed in
+firebase login                       # once, if not already signed in
 firebase deploy --only hosting
+firebase deploy --only firestore:rules   # required for account currency sync
 ```
 
 That publishes to the same Hosting site (`finnovahub.web.app`) as an update. `firebase.json`
@@ -62,15 +78,29 @@ the `site` value in `firebase.json` to the correct one. Hard-refresh the browser
 deploying to discard the old cached bundle.
 
 Security rules are included and enforce that each user can only touch documents whose
-`ownerId` matches their uid. Deploy them once (safe for the existing data):
+`ownerId` matches their uid. They also allow exactly one `users/{uid}` preferences document per
+account. Deploy them once (safe for the existing data):
 
 ```bash
 firebase deploy --only firestore:rules
 ```
 
-> Deploying rules is optional for the UI update, but strongly recommended — without them the
-> database may still allow public access. Keep a backup (Reports → Full backup) before any
-> bulk operation you are unsure about.
+> **The updated rules are required for account currency sync.** Without them, signed-in users
+> still see their data, but Settings shows “Account sync failed” and currency conversion is
+> refused by Firestore (the conversion checks and updates the account document in the same
+> transaction). Demo mode is unaffected. Keep a backup (Reports → Full backup) before any bulk
+> operation you are unsure about.
+
+## Tests
+
+```bash
+npm test          # Vitest unit tests
+npm run typecheck # tsc --noEmit
+npm run build     # typecheck + production bundle
+```
+
+The currency conversion maths (`conversionRate`, `convertAmount`, `roundMoney`) is covered by
+`src/lib/currencies.test.ts`.
 
 ## CSV import format
 
@@ -91,11 +121,14 @@ Rows with invalid dates or amounts are reported before anything is written.
 src/
   auth/AuthProvider.tsx    Firebase auth + demo session
   store/DataProvider.tsx   Firestore listeners + typed CRUD
+  store/SettingsProvider.tsx  Country, currency and theme preferences
   store/demo.ts            Local demo workspace with sample data
+  lib/currencies.ts        Country/currency catalogue, rates, conversion maths
+  lib/currencies.test.ts   Unit tests for the conversion maths
   lib/calc.ts              Money maths + insights engine
   lib/csv.ts               CSV import/export, JSON backup
   components/              App shell, dialogs, shared UI
-  pages/                   Dashboard, transactions, budgets, goals, reminders, reports, learn
+  pages/                   Dashboard, transactions, budgets, goals, reminders, reports, learn, settings
 firestore.rules            Owner-only security rules
 firebase.json              Hosting config (SPA rewrites, caching)
 ```

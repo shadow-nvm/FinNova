@@ -1,3 +1,5 @@
+import { activeCurrency } from "./currencies";
+
 export const MONTHS = [
   "Jan",
   "Feb",
@@ -13,47 +15,89 @@ export const MONTHS = [
   "Dec",
 ];
 
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const fullFormatters = new Map<string, Intl.NumberFormat>();
+const compactFormatters = new Map<string, Intl.NumberFormat>();
 
-/** Full money value, e.g. ₹1,234.50 */
-export function money(value: unknown): string {
-  return inr.format(Number(value || 0));
+function fullFormatter(): Intl.NumberFormat {
+  const { code, locale, decimals } = activeCurrency();
+  const key = `${locale}|${code}|${decimals}`;
+  let formatter = fullFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    fullFormatters.set(key, formatter);
+  }
+  return formatter;
 }
 
-/** Compact money for chart axes and tight cards, e.g. ₹12.5k, ₹1.2L */
+function compactFormatter(): Intl.NumberFormat {
+  const { code, locale } = activeCurrency();
+  const key = `${locale}|${code}`;
+  let formatter = compactFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "narrowSymbol",
+      notation: "compact",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    });
+    compactFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+/** Full money value in the active currency, e.g. ₹1,234.50 or $1,234.50 */
+export function money(value: unknown): string {
+  return fullFormatter().format(Number(value || 0));
+}
+
+/** Compact money for chart axes and tight cards, e.g. ₹12.5k, ₹1.2L, $12.5K */
 export function compactMoney(value: unknown): string {
   const n = Number(value || 0);
-  const sign = n < 0 ? "-" : "";
-  const abs = Math.abs(n);
-  const trim = (v: number) => String(Math.round(v * 10) / 10);
-  if (abs >= 1e7) return `${sign}₹${trim(abs / 1e7)}Cr`;
-  if (abs >= 1e5) return `${sign}₹${trim(abs / 1e5)}L`;
-  if (abs >= 1e3) return `${sign}₹${trim(abs / 1e3)}k`;
-  return `${sign}₹${abs.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  try {
+    return compactFormatter().format(n);
+  } catch {
+    return money(n);
+  }
+}
+
+/** Symbol of the active currency, for input prefixes. */
+export function currencySymbol(): string {
+  return activeCurrency().symbol;
 }
 
 /** Amount without the currency symbol, e.g. 1,234.50 */
 export function amount(value: unknown): string {
-  return Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  const { locale, decimals } = activeCurrency();
+  return Number(value || 0).toLocaleString(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
 }
 
-function parse(value?: string | null): Date | null {
+/** Timezone-safe parser: date-only strings are read as local dates. */
+export function parseDate(value?: string | null): Date | null {
   if (!value) return null;
-  const d = new Date(value);
+  // Date-only values (goal/reminder dates) must be read as local dates;
+  // `new Date("2026-12-15")` is UTC and can show the previous day in western
+  // timezones. Full ISO timestamps already carry their own offset.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const d = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** e.g. Aug 23, 2026 */
 export function dateLong(value?: string | null): string {
-  const d = parse(value);
+  const d = parseDate(value);
   return d
     ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : "";
@@ -61,13 +105,13 @@ export function dateLong(value?: string | null): string {
 
 /** e.g. Aug 23 */
 export function dateShort(value?: string | null): string {
-  const d = parse(value);
+  const d = parseDate(value);
   return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 }
 
 /** YYYY-MM key for a transaction date. */
 export function monthKeyOf(value?: string | null): string {
-  const d = parse(value);
+  const d = parseDate(value);
   if (!d) return "";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }

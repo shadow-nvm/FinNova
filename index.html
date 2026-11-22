@@ -21,6 +21,18 @@
     <meta property="og:type" content="website" />
     <meta name="robots" content="index, follow" />
     <title>FinNova — Smart Personal Finance Hub</title>
+    <script>
+      // Apply the saved theme before React mounts so there is no flash.
+      try {
+        var saved = JSON.parse(localStorage.getItem("finnova_settings_v1") || "null");
+        var theme = (saved && saved.theme) || localStorage.getItem("finnova_theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (error) {
+        /* ignore */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

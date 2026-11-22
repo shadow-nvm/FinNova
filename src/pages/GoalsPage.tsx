@@ -10,7 +10,7 @@ import {
 } from "../components/ui";
 import { goalProgress } from "../lib/calc";
 import { GOAL_ICONS } from "../lib/constants";
-import { dateLong, money } from "../lib/format";
+import { compactMoney, currencySymbol, dateLong, money } from "../lib/format";
 import type { Goal } from "../types";
 import { useData } from "../store/DataProvider";
 
@@ -20,6 +20,13 @@ type GoalModal =
   | { mode: "deposit"; goal: Goal }
   | { mode: "withdraw"; goal: Goal }
   | null;
+
+/** Rounds a quick-deposit suggestion to a human-friendly number. */
+function niceMoney(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 1);
+  return Math.round(value / magnitude) * magnitude;
+}
 
 export function GoalsPage() {
   const data = useData();
@@ -162,6 +169,25 @@ export function GoalsPage() {
   if (data.loading) return <LoadingPage />;
 
   const moneyModal = modal && (modal.mode === "deposit" || modal.mode === "withdraw") ? modal : null;
+  const quickAmounts = moneyModal
+    ? Array.from(
+        new Set(
+          [0.1, 0.25, 0.5]
+            .map((share) =>
+              niceMoney(
+                (moneyModal.mode === "deposit"
+                  ? Math.max(
+                      0,
+                      Number(moneyModal.goal.targetAmount || 0) -
+                        Number(moneyModal.goal.savedAmount || 0),
+                    )
+                  : Number(moneyModal.goal.savedAmount || 0)) * share,
+              ),
+            )
+            .filter((value) => value > 0),
+        ),
+      )
+    : [];
 
   return (
     <div className="page">
@@ -306,7 +332,7 @@ export function GoalsPage() {
               <div className="field">
                 <label htmlFor="goal-target">Target amount</label>
                 <div className="input-split">
-                  <span className="pre">₹</span>
+                  <span className="pre">{currencySymbol()}</span>
                   <input
                     id="goal-target"
                     type="number"
@@ -363,7 +389,7 @@ export function GoalsPage() {
             </div>
             <label htmlFor="goal-amount">Amount</label>
             <div className="input-split" style={{ marginBottom: 12 }}>
-              <span className="pre">₹</span>
+              <span className="pre">{currencySymbol()}</span>
               <input
                 id="goal-amount"
                 type="number"
@@ -377,14 +403,14 @@ export function GoalsPage() {
               />
             </div>
             <div className="chip-row" style={{ marginBottom: 16 }}>
-              {[500, 1000, 5000, 10000].map((quick) => (
+              {quickAmounts.map((quick) => (
                 <button
                   key={quick}
                   type="button"
                   className="chip"
                   onClick={() => setAmount(String(quick))}
                 >
-                  ₹{quick.toLocaleString("en-IN")}
+                  {compactMoney(quick)}
                 </button>
               ))}
               <button

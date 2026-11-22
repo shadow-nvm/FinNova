@@ -1,11 +1,12 @@
 import type { Budget, Goal, Reminder, Transaction } from "../types";
 import {
-  amount,
   clamp,
   currentMonthKey,
   lastMonthKeys,
+  money,
   monthKeyOf,
   monthShort,
+  parseDate,
 } from "./format";
 
 export interface MonthStats {
@@ -114,8 +115,9 @@ export function goalProgress(goal: Goal, today = new Date()): GoalProgress {
   const target = Number(goal.targetAmount || 0);
   const saved = Number(goal.savedAmount || 0);
   const pct = target > 0 ? clamp((saved / target) * 100, 0, 100) : 0;
-  const daysLeft = goal.targetDate
-    ? Math.ceil((new Date(goal.targetDate).getTime() - today.getTime()) / 86_400_000)
+  const targetDate = parseDate(goal.targetDate);
+  const daysLeft = targetDate
+    ? Math.ceil((targetDate.getTime() - today.getTime()) / 86_400_000)
     : null;
   const remaining = target - saved;
   const monthsLeft =
@@ -140,7 +142,8 @@ export function nextDue(reminder: Reminder, today = new Date()): Date {
   let due = new Date(today.getFullYear(), today.getMonth(), day);
   if (due.getTime() < startOfToday.getTime()) due = addMonths(due, 1);
   if (reminder.lastPaidDate) {
-    const paid = new Date(reminder.lastPaidDate);
+    const paid = parseDate(reminder.lastPaidDate);
+    if (!paid) return due;
     if (
       paid.getFullYear() === due.getFullYear() &&
       paid.getMonth() === due.getMonth()
@@ -200,9 +203,9 @@ export function buildInsights(
       emoji: "⚠️",
       title: "Monthly deficit",
       detail: "Spending exceeded income",
-      body: `Your spending (₹${amount(stats.expense)}) exceeded your income (₹${amount(
+      body: `Your spending (${money(stats.expense)}) exceeded your income (${money(
         stats.income,
-      )}) by ₹${amount(-stats.net)}. Trim one flexible category like Food or Shopping to get back on track.`,
+      )}) by ${money(-stats.net)}. Trim one flexible category like Food or Shopping to get back on track.`,
     });
   } else if (stats.income > 0 && rate < 10) {
     insights.push({
@@ -211,7 +214,7 @@ export function buildInsights(
       emoji: "🐢",
       title: "Savings rate under 10%",
       detail: `You're saving only ${rate}% of income`,
-      body: `Aim to save at least 10%–20% of your income. Review Entertainment, Shopping and Food for small weekly cuts. A ₹${amount(
+      body: `Aim to save at least 10%–20% of your income. Review Entertainment, Shopping and Food for small weekly cuts. A ${money(
         stats.income * 0.05,
       )} monthly shift would lift your rate to ~${rate + 5}%.`,
     });
@@ -222,7 +225,7 @@ export function buildInsights(
       emoji: "🏆",
       title: `Strong savings rate — ${rate}%`,
       detail: "You're keeping a healthy share of income",
-      body: `You kept ₹${amount(stats.net)} this month. Consider moving part of it into a goal or an emergency fund so it compounds instead of sitting idle.`,
+      body: `You kept ${money(stats.net)} this month. Consider moving part of it into a goal or an emergency fund so it compounds instead of sitting idle.`,
     });
   }
 
@@ -238,8 +241,8 @@ export function buildInsights(
       priority: "high",
       emoji: "🚨",
       title: `${b.category} over budget`,
-      detail: `₹${amount(-b.remaining)} over limit`,
-      body: `You've spent ₹${amount(b.spent)} on ${b.category}; your budget is ₹${amount(
+      detail: `${money(-b.remaining)} over limit`,
+      body: `You've spent ${money(b.spent)} on ${b.category}; your budget is ${money(
         b.amount,
       )} (${Math.round(b.pct)}%). Reduce further ${b.category.toLowerCase()} spending for the rest of the month.`,
     });
@@ -252,9 +255,9 @@ export function buildInsights(
       emoji: "🟠",
       title: `${b.category} nearing its limit`,
       detail: `${Math.round(b.pct)}% of budget used`,
-      body: `You've used ${Math.round(b.pct)}% of your ${b.category} budget (₹${amount(
+      body: `You've used ${Math.round(b.pct)}% of your ${b.category} budget (${money(
         b.amount,
-      )}). Only ₹${amount(b.remaining)} left this month.`,
+      )}). Only ${money(b.remaining)} left this month.`,
     });
   });
 
@@ -267,9 +270,9 @@ export function buildInsights(
       emoji: "🍕",
       title: `${topCategory.name} is ${share}% of your spending`,
       detail: "One category dominates this month",
-      body: `₹${amount(topCategory.value)} of ₹${amount(
+      body: `${money(topCategory.value)} of ${money(
         stats.expense,
-      )} went to ${topCategory.name}. A weekly cap of ₹${amount(
+      )} went to ${topCategory.name}. A weekly cap of ${money(
         Math.max(20, topCategory.value * 0.25),
       )} would bring this share closer to 25%.`,
     });
@@ -288,7 +291,7 @@ export function buildInsights(
           emoji: "📈",
           title: "Spending on the rise",
           detail: `${Math.round(change)}% higher than your 2-month average`,
-          body: `₹${amount(third.expense)} this month vs a ~₹${amount(
+          body: `${money(third.expense)} this month vs a ~${money(
             average,
           )} average. Check which categories grew to spot the driver.`,
         });
@@ -299,7 +302,7 @@ export function buildInsights(
           emoji: "📉",
           title: "Spending down — nice work",
           detail: `${Math.round(Math.abs(change))}% below your 2-month average`,
-          body: `Great momentum! Consider putting the freed-up ₹${amount(
+          body: `Great momentum! Consider putting the freed-up ${money(
             average - third.expense,
           )} into a savings goal.`,
         });
@@ -329,11 +332,11 @@ export function buildInsights(
         priority: "med",
         emoji: "🎯",
         title: `${goal.name} may be ambitious`,
-        detail: `Needs ~₹${amount(perMonth)}/month`,
-        body: `To finish by ${new Date(goal.targetDate).toLocaleDateString("en-US", {
+        detail: `Needs ~${money(perMonth)}/month`,
+        body: `To finish by ${(parseDate(goal.targetDate) ?? new Date()).toLocaleDateString("en-US", {
           month: "short",
           year: "numeric",
-        })}, you'd need about ₹${amount(
+        })}, you'd need about ${money(
           perMonth,
         )} per month. Extend the date or set up a small auto-transfer.`,
       });
@@ -343,8 +346,8 @@ export function buildInsights(
         priority: "low",
         emoji: "⏱️",
         title: `${goal.name} — on track`,
-        detail: perMonth > 0 ? `~₹${amount(perMonth)}/month to finish` : "Keep going",
-        body: `Keep contributing ~₹${amount(perMonth)} a month and you'll reach ₹${amount(
+        detail: perMonth > 0 ? `~${money(perMonth)}/month to finish` : "Keep going",
+        body: `Keep contributing ~${money(perMonth)} a month and you'll reach ${money(
           goal.targetAmount,
         )} on schedule.`,
       });
@@ -360,11 +363,11 @@ export function buildInsights(
         priority: days <= 2 ? "high" : "med",
         emoji: "🔔",
         title: `${reminder.title} due ${days === 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`}`,
-        detail: `₹${amount(reminder.amount || 0)} ${reminder.type === "bill" ? "bill" : "saving"}`,
+        detail: `${money(reminder.amount || 0)} ${reminder.type === "bill" ? "bill" : "saving"}`,
         body:
           reminder.type === "bill"
             ? "Keep auto-pay on or schedule it now to avoid a late fee."
-            : `Time to move ₹${amount(reminder.amount || 0)} into your savings goal.`,
+            : `Time to move ${money(reminder.amount || 0)} into your savings goal.`,
       });
     }
   });

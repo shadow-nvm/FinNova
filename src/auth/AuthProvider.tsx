@@ -176,7 +176,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsDemo(false);
     setUser(null);
     if (firebaseEnabled && auth && auth.currentUser) {
-      await signOut(auth);
+      try {
+        await signOut(auth);
+      } catch (cause) {
+        // Offline sign-out still clears the local session; never leave the
+        // button stuck on an unhandled rejection.
+        console.warn("[FinNova] Sign out finished locally only:", cause);
+      }
     }
   }, []);
 

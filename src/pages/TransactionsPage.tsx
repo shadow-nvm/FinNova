@@ -38,6 +38,7 @@ export function TransactionsPage() {
   const [sort, setSort] = useState<SortKey>("date-desc");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [duplicating, setDuplicating] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -184,6 +185,14 @@ export function TransactionsPage() {
         {money(transaction.amount)}
       </span>
       <div className="row-actions">
+        <button
+          className="btn btn-sm btn-ghost"
+          onClick={() => setDuplicating(transaction)}
+          type="button"
+          title="Duplicate this transaction"
+        >
+          Copy
+        </button>
         <button className="btn btn-sm btn-ghost" onClick={() => setEditing(transaction)} type="button">
           Edit
         </button>
@@ -349,6 +358,16 @@ export function TransactionsPage() {
           if (!editing) return;
           await data.updateTransaction(editing.id, input);
           notify("Transaction updated.");
+        }}
+      />
+
+      <TransactionModal
+        open={Boolean(duplicating)}
+        duplicate={duplicating}
+        onClose={() => setDuplicating(null)}
+        onSave={async (input) => {
+          await data.addTransaction(input);
+          notify("Transaction copied.");
         }}
       />
 

@@ -1,3 +1,4 @@
+import { convertAmount } from "../lib/currencies";
 import type {
   Budget,
   BudgetInput,
@@ -227,6 +228,23 @@ export const demoStore = {
   },
   snapshot(): DemoState {
     return state;
+  },
+  convertAmounts(from: string, to: string): void {
+    if (from === to) return;
+    const convert = (value: unknown) => convertAmount(Number(value || 0), from, to);
+    commit({
+      transactions: state.transactions.map((tx) => ({ ...tx, amount: convert(tx.amount) })),
+      budgets: state.budgets.map((budget) => ({ ...budget, amount: convert(budget.amount) })),
+      goals: state.goals.map((goal) => ({
+        ...goal,
+        targetAmount: convert(goal.targetAmount),
+        savedAmount: convert(goal.savedAmount),
+      })),
+      reminders: state.reminders.map((reminder) => ({
+        ...reminder,
+        amount: convert(reminder.amount),
+      })),
+    });
   },
   addTransaction(input: TxInput): void {
     commit({

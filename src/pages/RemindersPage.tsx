@@ -10,7 +10,7 @@ import {
 } from "../components/ui";
 import { daysUntil, nextDue } from "../lib/calc";
 import { MAX_REMINDER_DAY } from "../lib/constants";
-import { clamp, dateShort, money, todayInput } from "../lib/format";
+import { clamp, currencySymbol, dateShort, money, todayInput } from "../lib/format";
 import type { Reminder, ReminderInput } from "../types";
 import { useData } from "../store/DataProvider";
 
@@ -266,7 +266,7 @@ export function RemindersPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="reminder-amount">Amount (₹)</label>
+                <label htmlFor="reminder-amount">Amount ({currencySymbol()})</label>
                 <input
                   id="reminder-amount"
                   type="number"
